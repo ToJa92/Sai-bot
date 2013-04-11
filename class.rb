@@ -10,46 +10,40 @@ end
 
 # Create some basic classes so that we can do something
 
-class SCOPE
+class ProgramRoot
+  def initialize(stmt_list)
+    @stmt_list = stmt_list
+  end
+end
+
+class CALLSTACK
   def initialize
+    # count will determine the number of top-level
     @count = 0
+    @nest = 0
     @stack = []
     push_frame
   end
 
-  # would probably be called whenever curly braces are found
+  # adds a new top-level stack
   def push
     @count += 1
-    @stack << {}
+    @nest += 1
+    @stack << []
   end
 
-  def pop
-    @count -= 1
-    @stack.pop
+  # adds a new `nested' stack, IE. a list in the current list
+  def nest
+    @nest += 1
+    @stack[@count] << []
   end
 
   def add_obj(obj)
-    # If everything goes correctly, this should not happen.
-    # For instance, assignment should not be handled by adding a object
-    raise(ObjAlreadyDefined, "#{obj.name} already defined") if @stack[@count].has_key? obj.name
-    @stack[@count][obj.name] << obj
-  end
-
-  def get_obj(name)
-    raise(ObjNotCreated, "Object #{name} can't be found") unless @stack[@count].has_key? name
-    @stack[@count][name]
-  end
-
-  def update_obj(name, obj)
-    @stack[@count][name] = obj
-  end
-
-  def obj_in_curr_scope?(name)
-    @stack[@count].has_key? name
+    @stack[@count] << obj
   end
 
   def to_s
-    "scope with #{@count} frames."
+    "callstack with #{@count} frames."
   end
 end
 
@@ -82,5 +76,7 @@ end
 # Implementation of common functions
 
 class PRINT < FUNC
-  
+  def initialize(input)
+    super(
+  end
 end
