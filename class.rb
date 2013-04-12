@@ -14,6 +14,12 @@ class ProgramRoot
   def initialize(stmt_list)
     @stmt_list = stmt_list
   end
+
+  def eval(stack)
+    @stmt_list.each do |stmt|
+      stmt.eval(stack)
+    end
+  end
 end
 
 class CALLSTACK
@@ -77,6 +83,6 @@ end
 
 class PRINT < FUNC
   def initialize(input)
-    super(
+    super("print", 
   end
 end

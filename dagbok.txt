@@ -1,3 +1,7 @@
 2013-04-11
 ----------
 Först tänkte jag att att man skulle kunna representera anropskedjan som listor i listor i listor (osv.). Detta sätt att göra det på skulle bli väldigt jobbigt att hålla reda på. Jag kollade därför projektsidorna efter information om hur man skulle kunna göra, och kom fram till att ett träd givetvis är en bra datastruktur att använda sig av.
+
+2013-04-12
+----------
+Inga framsteg idag, funderade mest över hur man gör med trädstrukturen och scope. Jag är ganska säker på att jag förstår hur man gör nu, så förhoppningsvis blir det större framsteg nästa gång.
