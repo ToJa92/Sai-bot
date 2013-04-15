@@ -5,3 +5,8 @@ Först tänkte jag att att man skulle kunna representera anropskedjan som listor
 2013-04-12
 ----------
 Inga framsteg idag, funderade mest över hur man gör med trädstrukturen och scope. Jag är ganska säker på att jag förstår hur man gör nu, så förhoppningsvis blir det större framsteg nästa gång.
+
+2013-04-15
+----------
+Påbörjade skapandet av noder, det är ännu oklart hur man ska hantera scope och liknande. Förhoppningsvis går det systemet relativt enkelt att integrera sen i koden.
+
