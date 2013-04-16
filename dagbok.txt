@@ -10,3 +10,6 @@ Inga framsteg idag, funderade mest över hur man gör med trädstrukturen och sc
 ----------
 Påbörjade skapandet av noder, det är ännu oklart hur man ska hantera scope och liknande. Förhoppningsvis går det systemet relativt enkelt att integrera sen i koden.
 
+2013-04-16
+----------
+Jag har skapat ett Scope-objekt som ska innehålla både variabler och funktioner.

@@ -8,6 +8,49 @@ end
 class ObjAlreadyDefined < StandardError
 end
 
+class Scope
+  def initialize
+    @scope = []
+    @scope_func = []
+  end
+
+  def push
+    @scope << {}
+    @scope_func << {}
+  end
+
+  def pop
+    @scope.pop
+    @scope_func.pop
+  end
+
+  def add_var(var)
+    @scope[@scope.size][var.name, [var.type, var.value]]
+  end
+
+  def get_var(name)
+    @scope[@scope.size][name]
+  end
+
+  def update_var(name, value)
+    new_var = @scope[@scope.size][name]
+    new_var[1] = value
+    @scope[@scope.size][name] = old_var
+  end
+
+  def add_func(func)
+    @scope_func[@scope_func.size][func.name, [func.type, func.body]]
+  end
+
+  def get_func_return_val(name)
+    @scope_func[@scope_func.size][name][0]
+  end
+
+  def get_func_body(name)
+    @scope_func[@scope_func.size][name][1]
+  end
+end
+
 # Create some basic classes so that we can do something
 
 class ProgramRoot
@@ -19,63 +62,6 @@ class ProgramRoot
     @stmt_list.each do |stmt|
       stmt.eval(stack)
     end
-  end
-end
-
-class CALLSTACK
-  def initialize
-    # count will determine the number of top-level
-    @count = 0
-    @nest = 0
-    @stack = []
-    push_frame
-  end
-
-  # adds a new top-level stack
-  def push
-    @count += 1
-    @nest += 1
-    @stack << []
-  end
-
-  # adds a new `nested' stack, IE. a list in the current list
-  def nest
-    @nest += 1
-    @stack[@count] << []
-  end
-
-  def add_obj(obj)
-    @stack[@count] << obj
-  end
-
-  def to_s
-    "callstack with #{@count} frames."
-  end
-end
-
-class FUNC
-  attr_reader :name, :args, :body
-  def initialize(name, args, body)
-    @name = name
-    @args = args
-    @body = body
-  end
-
-  def to_s
-    "function #{@name} with args #{@args} and body #{@body}"
-  end
-end
-
-class VAR
-  attr_reader :type, :identifier, :value
-  def initialize(type, identifier, value)
-    @type = type
-    @identifier = identifier
-    @value = value
-  end
-
-  def to_s
-    "variable #{@identifier} with type #{@type} and value #{@value}"
   end
 end
 
@@ -350,19 +336,45 @@ class ComparisonNode
 end
 
 class AddNode
+  def initialize(op1, op2)
+    @op1, @op2 = op1, op2
+  end
 
+  def eval
+    @op1.eval + @op2.eval
+  end
 end
 
-class SubtractNode
+# TODO: type safety. here?
 
+class SubtractNode
+  def initialize(op1, op2)
+    @op1, @op2 = op1, op2
+  end
+
+  def eval
+    @op1.eval - @op2.eval
+  end
 end
 
 class MultiplyNode
+  def initialize(op1, op2)
+    @op1, @op2 = op1, op2
+  end
 
+  def eval
+    @op1.eval * @op2.eval
+  end
 end
 
 class DivisionNode
+  def initialize(op1, op2)
+    @op1, @op2 = op1, op2
+  end
 
+  def eval
+    @op1.eval / @op2.eval
+  end
 end
 
 class UnaryPlusNode
