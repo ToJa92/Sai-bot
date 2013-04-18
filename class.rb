@@ -10,44 +10,34 @@ end
 
 class Scope
   def initialize
-    @scope = []
-    @scope_func = []
-  end
-
-  def push
-    @scope << {}
-    @scope_func << {}
-  end
-
-  def pop
-    @scope.pop
-    @scope_func.pop
+    @scope = {}
+    @scope_func = {}
   end
 
   def add_var(var)
-    @scope[@scope.size][var.name, [var.type, var.value]]
+    @scope[var.name] = [var.type, var.value]
   end
 
   def get_var(name)
-    @scope[@scope.size][name]
+    @scope[name]
   end
 
   def update_var(name, value)
-    new_var = @scope[@scope.size][name]
+    new_var = get_var(name)
     new_var[1] = value
-    @scope[@scope.size][name] = old_var
+    @scope[name] = old_var
   end
 
   def add_func(func)
-    @scope_func[@scope_func.size][func.name, [func.type, func.body]]
+    @scope_func[func.name, [func.type, func.body]]
   end
 
   def get_func_return_val(name)
-    @scope_func[@scope_func.size][name][0]
+    @scope_func[name][0]
   end
 
   def get_func_body(name)
-    @scope_func[@scope_func.size][name][1]
+    @scope_func[name][1]
   end
 end
 
@@ -56,6 +46,7 @@ end
 class ProgramRoot
   def initialize(stmt_list)
     @stmt_list = stmt_list
+    @scope = Scope.new
   end
 
   def eval(stack)
@@ -242,8 +233,8 @@ end
 
 # Data types
 
-# constant number node, also used for floating point numbers(?)
-class NumberNode
+# constant number node
+class IntegerNode
   def initialize(num)
     @num = num
   end
