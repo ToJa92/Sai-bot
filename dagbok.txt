@@ -13,3 +13,7 @@ Påbörjade skapandet av noder, det är ännu oklart hur man ska hantera scope o
 2013-04-16
 ----------
 Jag har skapat ett Scope-objekt som ska innehålla både variabler och funktioner.
+
+2013-04-19
+----------
+Lagt till parametern scope till alla eval-funktioner(utom för ProgramNode), samt börjat ändra lite i PrintNode.
