@@ -2,16 +2,15 @@
 
 # Define exceptions that will be used to signal errors
 
-class ObjNotCreated < StandardError
+class VarNotFound < StandardError
 end
 
 class ObjAlreadyDefined < StandardError
 end
 
 class Scope
-  def initialize
-    @scope = {}
-    @scope_func = {}
+  def initialize(parent = nil)
+    @scope, @scope_func = {}, {}, parent
   end
 
   def add_var(var)
@@ -19,7 +18,19 @@ class Scope
   end
 
   def get_var(name)
-    @scope[name]
+    temp = self
+    # dynamic scope, iterate backwards through scopes until we find the variable
+    while not temp.nil? and not temp.has_key? name do
+      temp = temp.parent
+    end
+
+    # if we have the key, we return it.
+    # if we don't, we know we're at the last scope and can cast an exception.
+    if self.has_key? name then
+      return self[name]
+    end
+
+    raise VarNotFound, "In Scope: Unable to find variable with name #{name}"
   end
 
   def update_var(name, value)
@@ -39,6 +50,19 @@ class Scope
   def get_func_body(name)
     @scope_func[name][1]
   end
+end
+
+# A helper function that takes a scope and a variable as a argument.
+# Will return a value based on the type of object, or nil if there is no value.
+# Maybe the scope rules can be implemented here.
+def get_val(scope, var)
+  if var.is_a? IdentifierNode then
+    return scope.get_var(var.name)
+  elsif (var.is_a? IntegerNode) or (var.is_a? FloatNode) then
+    return var.eval
+  end
+  return nil
+
 end
 
 # Create some basic classes so that we can do something
@@ -66,11 +90,8 @@ class PrintNode
 
   def eval(scope)
     @input.each do |stmt|
-      val = nil;
-      if stmt.is_a? IdentifierNode then
-        val = scope.get_var(stmt.name)
-      end
-      puts(stmt)
+      val = get_val(scope, stmt);
+      puts(stmt) if val
     end
     true
   end
@@ -248,14 +269,24 @@ class IntegerNode
 end
 
 class IdentifierNode
-  attr_reader :name
+  attr_reader :name, :type, :value
 
+  def initialize(name, type, value = nil)
+     @name, @type, @value = name, type, value
+  end
+
+  def eval(scope)
+    scope.add_var(self)
+  end
+end
+
+class FloatNode
   def initialize(name, val = nil)
      @name, @val = name, val
   end
 
   def eval(scope)
-    scope.add_var(@name, @val)
+    @val
   end
 end
 

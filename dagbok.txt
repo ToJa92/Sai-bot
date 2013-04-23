@@ -1,14 +1,22 @@
 2013-04-11
 ----------
-Först tänkte jag att att man skulle kunna representera anropskedjan som listor i listor i listor (osv.). Detta sätt att göra det på skulle bli väldigt jobbigt att hålla reda på. Jag kollade därför projektsidorna efter information om hur man skulle kunna göra, och kom fram till att ett träd givetvis är en bra datastruktur att använda sig av.
+Först tänkte jag att att man skulle kunna representera anropskedjan som listor
+      i listor i listor (osv.). Detta sätt att göra det på skulle bli väldigt
+      jobbigt att hålla reda på. Jag kollade därför projektsidorna efter
+      information om hur man skulle kunna göra, och kom fram till att ett
+      träd givetvis är en bra datastruktur att använda sig av.
 
 2013-04-12
 ----------
-Inga framsteg idag, funderade mest över hur man gör med trädstrukturen och scope. Jag är ganska säker på att jag förstår hur man gör nu, så förhoppningsvis blir det större framsteg nästa gång.
+Inga framsteg idag, funderade mest över hur man gör med trädstrukturen och
+     scope. Jag är ganska säker på att jag förstår hur man gör nu, så
+     förhoppningsvis blir det större framsteg nästa gång.
 
 2013-04-15
 ----------
-Påbörjade skapandet av noder, det är ännu oklart hur man ska hantera scope och liknande. Förhoppningsvis går det systemet relativt enkelt att integrera sen i koden.
+Påbörjade skapandet av noder, det är ännu oklart hur man ska hantera scope och
+	  liknande. Förhoppningsvis går det systemet relativt enkelt att
+	  integrera sen i koden.
 
 2013-04-16
 ----------
@@ -16,4 +24,18 @@ Jag har skapat ett Scope-objekt som ska innehålla både variabler och funktione
 
 2013-04-19
 ----------
-Lagt till parametern scope till alla eval-funktioner(utom för ProgramNode), samt börjat ändra lite i PrintNode.
+Lagt till parametern scope till alla eval-funktioner(utom för ProgramNode),
+     samt börjat ändra lite i PrintNode.
+
+2013-04-22
+----------
+Scope har nu uppdaterats för dynamiskt scope. Eftersom Scope nu även håller reda
+      på vilken dess förälder är så blir det (förhoppningsvis) enkelt att
+      iterera bakåt genom Scope och hitta variabeln man letar efter.
+
+2013-04-23
+----------
+Jag skapade idag en get_val()-funktion som ska underlätta för de funktioner
+    som behöver komma åt olika slags värden från variabler. Den ser enkel ut
+    men förhoppningsvis kan den hjälpa mig att göra det lätt att ändra på
+    saker och ting sen.
