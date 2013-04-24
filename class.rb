@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+debug = nil;
+
 # Define exceptions that will be used to signal errors
 
 class VarNotFound < StandardError
@@ -9,64 +11,98 @@ class ObjAlreadyDefined < StandardError
 end
 
 class Scope
+  # Ugly solution, might be able to fix it later
+  attr_accessor :scope_var, :scope_func
+  
   def initialize(parent = nil)
     @scope, @scope_func = {}, {}, parent
   end
 
   def add_var(var)
-    @scope[var.name] = [var.type, var.value]
+    if debug then
+      temp = self
+      while not temp.nil? and not temp.scope_var.has_key? var.name do
+        temp = temp.parent
+      end
+      if temp != self then
+        puts "Shadowing variable #{var.name} from previous scope"
+      end
+    end
+    temp.scope_var[var.name] = [var.type, var.value]
   end
 
   def get_var(name)
     temp = self
     # dynamic scope, iterate backwards through scopes until we find the variable
-    while not temp.nil? and not temp.has_key? name do
+    while not temp.nil? and not temp.scope_var.has_key? name do
       temp = temp.parent
     end
 
     # if we have the key, we return it.
-    # if we don't, we know we're at the last scope and can cast an exception.
-    if self.has_key? name then
-      return self[name]
+    # if we don't, we know we've iterated to nil and we can cast an exception
+    if temp.scope_var.has_key? name then
+      return temp.scope_var[name]
     end
 
     raise VarNotFound, "In Scope: Unable to find variable with name #{name}"
   end
 
   def update_var(name, value)
+    temp = self
+    while not temp.nil? and not temp.scope_var.has_key? name do
+      temp = temp.parent
+    end
+    if debug and temp != self then
+      puts "Updated variable in older scope"
+    end
     new_var = get_var(name)
     new_var[1] = value
-    @scope[name] = old_var
+    temp.scope_var[name] = new_var
   end
 
   def add_func(func)
-    @scope_func[func.name, [func.type, func.body]]
+    if debug then
+      temp = self
+      while not temp.nil? and not temp.scope_func.has_key? func.name do
+        temp = temp.parent
+      end
+      if temp != self then
+        puts "Shadowing function #{func.name} from previous scope"
+      end
+    end
+    @scope_func[func.name] = [func.type, func.body]
   end
 
-  def get_func_return_val(name)
-    @scope_func[name][0]
-  end
+  def get_func(name)
+    temp = self
+    # dynamic scope, iterate backwards through scopes until we find the variable
+    while not temp.nil? and not temp.scope_func.has_key? name do
+      temp = temp.parent
+    end
 
-  def get_func_body(name)
-    @scope_func[name][1]
+    # if we have the key, we return it.
+    # if we don't, we know we've iterated to nil and we can cast an exception
+    if temp.scope_func.has_key? name then
+      return temp.scope_func[name]
+    end
+
+    raise VarNotFound, "In Scope: Unable to find function with name #{name}"
   end
 end
 
 # A helper function that takes a scope and a variable as a argument.
 # Will return a value based on the type of object, or nil if there is no value.
-# Maybe the scope rules can be implemented here.
-def get_val(scope, var)
+def get_var(scope, var)
   if var.is_a? IdentifierNode then
     return scope.get_var(var.name)
   elsif (var.is_a? IntegerNode) or (var.is_a? FloatNode) then
     return var.eval
   end
+  
   return nil
-
 end
 
-# Create some basic classes so that we can do something
-
+# ProgramRoot will act as the root node of the program tree
 class ProgramRoot
   def initialize(stmt_list)
     @stmt_list = stmt_list
@@ -90,10 +126,9 @@ class PrintNode
 
   def eval(scope)
     @input.each do |stmt|
-      val = get_val(scope, stmt);
+      val = get_var(scope, stmt);
       puts(stmt) if val
     end
-    true
   end
 end
 
@@ -106,7 +141,8 @@ class InputNode
   # TODO: stmt should probably be looked-up in the scope so we assign the correct var
   def eval(scope)
     @input.each do |stmt|
-      stmt = gets
+      user_input = gets
+      scope.update_var(stmt, user_input)
     end
   end
 end
@@ -118,7 +154,12 @@ class InsertNode
   end
 
   def eval(scope)
-    # getVarById(@id) << expr.eval
+    new_list = get_var(scope, @id)
+    if new_list.is_a? ListNode then
+      new_list << expr.eval(scope)
+    else
+      raise TypeError, "Expected ListNode, got #{new_list.class}"
+    end
   end
 end
 
@@ -130,25 +171,35 @@ class RemoveNode
   end
 
   def eval(scope)
+    new_list = get_var(scope, @id)
     # array indexes can have a -(minus) prepended which will cause Ruby
     # to select the element from the right side
-    # raise "index out of bounds" if @index.abs > lst.size
-    # lst = getVarById(@id,scope)
-    # lst.delete_at @index
-    # saveVarById(@id, scope, lst);
+    raise(IndexError, "Index out of bounds") if @index.abs > (new_list.size - 1)
+    new_list.delete_at @index
+    scope.update_var(@id, new_list)
   end
 end
 
-#class InsertNodeWithoutIndex ?
 class InsertNode
-  def initialize(id, expr, index)
+  def initialize(id, expr, index = nil)
     @id, @expr, @index = id, expr, index
   end
 
   def eval(scope)
-    #lst = getVarById(@id, scope)
-    #raise "index out of bounds" if @index.abs > lst.size
-    #lst.insert(@index, @expr.eval(scope))
+    new_list = get_var(scope, @id)
+    # new_list might be nil
+    # new_list.size could be the new last index, so (size + 1) would be too much
+    if (not new_list.nil?) and (@index.abs > (new_list.size + 1)) then
+      raise(IndexError, "Index out of bounds")
+    end
+
+    if new_list.nil? then
+      new_list << @expr.eval(scope)
+    else
+      new_list.insert(@index, @expr.eval(scope))
+    end
+
+    scope.update_var(@id, new_list)
   end
 end
 
@@ -158,6 +209,8 @@ class AtNode
   end
 
   def eval(scope)
+    new_list = get_var(scope, @id)
+    raise
     #lst = getVarById(@id, scope)
     #raise "index out of bounds" if @index.abs > lst.size
     #return lst[@index]

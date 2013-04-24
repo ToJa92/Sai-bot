@@ -39,3 +39,11 @@ Jag skapade idag en get_val()-funktion som ska underlätta för de funktioner
     som behöver komma åt olika slags värden från variabler. Den ser enkel ut
     men förhoppningsvis kan den hjälpa mig att göra det lätt att ändra på
     saker och ting sen.
+
+2013-04-24
+----------
+Dagen har ägnats åt att fixa till ytterligare några detaljer i Scope.
+Därefter började jag fixa till alla de olika noderna och dess beteende.
+Tyvärr känns det som att det kanske kan bli problem senare med att
+       ex. uppdatera variabler. Förhoppningsvis fungerar det som
+       jag tänkt och inga problem uppstår.
