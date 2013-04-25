@@ -47,3 +47,14 @@ Därefter började jag fixa till alla de olika noderna och dess beteende.
 Tyvärr känns det som att det kanske kan bli problem senare med att
        ex. uppdatera variabler. Förhoppningsvis fungerar det som
        jag tänkt och inga problem uppstår.
+
+2013-04-25
+----------
+Idag har det gått väldigt bra, det känns som att det Scope jag skapat
+     kommer att kunna fungera även i praktiken. Ett problem är hur jag
+     ska hantera return-satser. En lösning är ju givetvis att varje ställe
+     där en return-nod är att förvänta kolla om det är en return-nod,
+     och isåfall helt enkelt returnera det uttryck den har i sig.
+     Det är väll inte den direkt snyggaste lösningen, men den bör fungera.
+IdentifierNode borde inte spara typ och data, utan använda sig av typen för
+	       att skapa ett nytt objekt av ``korrekt'' typ.

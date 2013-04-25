@@ -24,7 +24,7 @@ class Scope
       while not temp.nil? and not temp.scope_var.has_key? var.name do
         temp = temp.parent
       end
-      if temp != self then
+      if temp != nil and temp != self then
         puts "Shadowing variable #{var.name} from previous scope"
       end
     end
@@ -210,10 +210,8 @@ class AtNode
 
   def eval(scope)
     new_list = get_var(scope, @id)
-    raise
-    #lst = getVarById(@id, scope)
-    #raise "index out of bounds" if @index.abs > lst.size
-    #return lst[@index]
+    raise IndexError, "Index out of bounds" if @index.abs > new_list.size
+    return new_list[@index]
   end
 end
 
@@ -223,7 +221,7 @@ class LengthNode
   end
 
   def eval(scope)
-    #return getVarById(@id, scope).size
+    get_var(scope, @id).size
   end
 end
 
@@ -233,9 +231,10 @@ class IfStmtNode
   end
 
   def eval(scope)
+    @child_scope = Scope(scope)
     if @cond.eval then
       @stmts.each do |stmt|
-        stmt.eval
+        stmt.eval(@child_scope)
       end
     end
   end
@@ -247,9 +246,10 @@ class IfElseStmtNode
   end
 
   def eval(scope)
+    @child_scope = Scope(scope)
     if @cond.eval then
       @stmts.each do |stmt|
-        stmt.eval
+        stmt.eval(@child_scope)
       end
     end
   end
@@ -261,27 +261,28 @@ class ElseStmtNode
   end
 
   def eval(scope)
+    @child_scope = Scope(scope)
     @stmts.each do |stmt|
-      stmt.eval
+      stmt.eval(@child_scope)
     end
   end
 end
 
-# TODO: Limit iterations on ForStmt and WhileStmt?
-
 class ForStmtNode
   def initialize(assign_stmt, test_stmt, incr_expr, stmts)
-    @assign_stmt, @test_stmt, @incr_expr, @stmts = assign_stmt, test_stmt, incr_expr, stmts
+    @assign_stmt, @test_stmt = assign_stmt, test_stmt
+    @incr_expr, @stmts = incr_expr, stmts
   end
 
   def eval(scope)
-    @new_scope = createChildScope(scope)
-    @assign_stmt.eval(@new_scope) # should somehow be added to the scope in which test_stmt is eval'd
+    # We want the execution to take place in its own scope
+    @new_scope = Scope(scope)
+    @assign_stmt.eval(@new_scope)
     while @test_stmt.eval(@new_scope) do
       @stmts.each do |stmt|
         stmt.eval(@new_scope)
       end
-      # simply eval incr_expr after each round to make sure something's happening
+      # eval @incr_expr after each loop as to (hopefully) avoid an infinite loop
       @incr_expr.eval(@new_scope)
     end
   end
@@ -293,7 +294,7 @@ class WhileStmtNode
   end
 
   def eval(scope)
-    @new_scope = createChildScope(scope)
+    @new_scope = Scope(scope)
     while @expr.eval(@new_scope) do
       @stmts.each do |stmt|
         stmt.eval(@new_scope)
@@ -302,6 +303,9 @@ class WhileStmtNode
   end
 end
 
+# TODO: Create this function.
+#       Maybe it can be empty, and we instead check if we find a ReturnNode
+#       where appropriate(in WhileStmtNode etc.)
 class ReturnNode
   def eval(scope)
     #getCurrScopeFunc.return?
@@ -321,6 +325,8 @@ class IntegerNode
   end
 end
 
+# TODO: Type should determine what type of object to create, and save the object
+#       in its value.
 class IdentifierNode
   attr_reader :name, :type, :value
 
@@ -373,6 +379,21 @@ class ListNode
   end
 end
 
+# This function will, given a value, ``calculate'' whether it's true or false.
+def value_to_boolean(value, scope)
+  case value.is_a?
+  when IdentifierNode
+    val = scope.get_var(value.name)
+    if val
+    end
+  when IntegerNode
+  when FloatNode
+  when StringNode
+  when BoolNode
+  when ListNode
+  end
+end
+
 # Boolean statements and Numerical statements
 
 class AndNode
@@ -381,6 +402,8 @@ class AndNode
   end
 
   def eval(scope)
+    if @op1.is_a? 
+    end
     @op1.eval(scope) and @op2.eval(scope)
   end
 end
