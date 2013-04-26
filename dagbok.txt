@@ -58,3 +58,24 @@ Idag har det gått väldigt bra, det känns som att det Scope jag skapat
      Det är väll inte den direkt snyggaste lösningen, men den bör fungera.
 IdentifierNode borde inte spara typ och data, utan använda sig av typen för
 	       att skapa ett nytt objekt av ``korrekt'' typ.
+
+2013-04-26
+----------
+Gjorde om variabelnoderna så att de ärver av en gemensam value-node. Detta
+       städade upp en del duplicerad kod vilket var trevligt. Detta gör det
+       även enklare att ändra på variabelnoderna om så krävs. Den enda nod
+       som inte fick någon ändring var IdentifierNode som ju är lite speciell.
+Jag har nu fixat till IndentifierNode samt value_to_bool(). Den sistnämnda
+       är inte direkt jättebra men den underlättar hanteringen i de olika
+       Boolean-noderna senare.
+Alla noder är nu i princip klara, och det återstår väll en del finputs.
+Det saknas även en konstruktion ``break'' för att hoppa ur loopar,
+    så denna behöver fixas till.
+Nu är de unära och binära operatorerna konsoldierade så de ärver från en
+   gemensam basklass. Denna använder sedan metoden ``send'' för att utföra
+   den korrekta operationen.
+   Kul att notera: De unära operationerna - och + heter internt -@ respektive
+   +@ i Ruby.
+Vid en simpel testkörning hittade jag några småfel i koden som jag sedan rättade
+    till. Det handlade mest om att jag inte evaluerade argument på rätt ställen.
+Att göra: en IdentifierNameNode som bara innehåller variabelnamn utan värde.

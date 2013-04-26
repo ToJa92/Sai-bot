@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-debug = nil;
+$debug = 1;
 
 # Define exceptions that will be used to signal errors
 
@@ -12,14 +12,14 @@ end
 
 class Scope
   # Ugly solution, might be able to fix it later
-  attr_accessor :scope_var, :scope_func
+  attr_accessor :scope_var, :scope_func, :parent
   
   def initialize(parent = nil)
-    @scope, @scope_func = {}, {}, parent
+    @scope_var, @scope_func = {}, {}, parent
   end
 
   def add_var(var)
-    if debug then
+    if $debug then
       temp = self
       while not temp.nil? and not temp.scope_var.has_key? var.name do
         temp = temp.parent
@@ -28,7 +28,7 @@ class Scope
         puts "Shadowing variable #{var.name} from previous scope"
       end
     end
-    temp.scope_var[var.name] = [var.type, var.value]
+    @scope_var[var.name] = var.value
   end
 
   def get_var(name)
@@ -39,7 +39,7 @@ class Scope
     end
 
     # if we have the key, we return it.
-    # if we don't, we know we've iterated to nil and we can cast an exception
+    # if we don't, we know we've iterated to nil and we can raise an exception
     if temp.scope_var.has_key? name then
       return temp.scope_var[name]
     end
@@ -49,19 +49,17 @@ class Scope
 
   def update_var(name, value)
     temp = self
-    while not temp.nil? and not temp.scope_var.has_key? name do
+    while not temp.parent.nil? and not temp.scope_var.has_key? name do
       temp = temp.parent
     end
-    if debug and temp != self then
+    if $debug and temp != self then
       puts "Updated variable in older scope"
     end
-    new_var = get_var(name)
-    new_var[1] = value
-    temp.scope_var[name] = new_var
+    temp.scope_var[name] = value
   end
 
   def add_func(func)
-    if debug then
+    if $debug then
       temp = self
       while not temp.nil? and not temp.scope_func.has_key? func.name do
         temp = temp.parent
@@ -96,7 +94,7 @@ def get_var(scope, var)
   if var.is_a? IdentifierNode then
     return scope.get_var(var.name)
   elsif (var.is_a? IntegerNode) or (var.is_a? FloatNode) then
-    return var.eval
+    return var.eval(scope)
   end
   
   return nil
@@ -127,7 +125,7 @@ class PrintNode
   def eval(scope)
     @input.each do |stmt|
       val = get_var(scope, stmt);
-      puts(stmt) if val
+      puts(val.eval(scope)) if val
     end
   end
 end
@@ -138,9 +136,9 @@ class InputNode
     @input = input
   end
 
-  # TODO: stmt should probably be looked-up in the scope so we assign the correct var
   def eval(scope)
     @input.each do |stmt|
+      puts "-----INPUT-----" if $debug
       user_input = gets
       scope.update_var(stmt, user_input)
     end
@@ -307,6 +305,10 @@ end
 #       Maybe it can be empty, and we instead check if we find a ReturnNode
 #       where appropriate(in WhileStmtNode etc.)
 class ReturnNode
+  def initialize(expr)
+    @expr = expr
+  end
+  
   def eval(scope)
     #getCurrScopeFunc.return?
   end
@@ -314,87 +316,93 @@ end
 
 # Data types
 
-# constant number node
-class IntegerNode
-  def initialize(num)
-    @num = num
+# A simple, constant node
+class ValueNode
+  def initialize(val = nil)
+    raise ArgumentError, "Can't make a constant variable without val" if not val
+    @val = val
   end
 
   def eval(scope)
-    @num
-  end
+    @val
+  end  
+end
+
+# TODO: to_string in every class, so that print works
+class IntegerNode < ValueNode
+end
+
+class FloatNode < ValueNode
+end
+
+class StringNode < ValueNode
+end
+
+class BoolNode < ValueNode
+end
+
+class ListNode < ValueNode
 end
 
 # TODO: Type should determine what type of object to create, and save the object
 #       in its value.
 class IdentifierNode
-  attr_reader :name, :type, :value
+  attr_reader :name, :value
 
   def initialize(name, type, value = nil)
-     @name, @type, @value = name, type, value
+    # Encapsulates the value in the appropriate node
+    case type
+    when "int"
+      value = IntegerNode.new(value)
+    when "float"
+      value = FloatNode.new(value)
+    when "string"
+      value = StringNode.new(value)
+    when "bool"
+      value = BoolNode.new(value)
+    when "list"
+      value = ListNode.new(value)
+    end
+    @name, @value = name, value
   end
 
   def eval(scope)
     scope.add_var(self)
   end
-end
 
-class FloatNode
-  def initialize(name, val = nil)
-     @name, @val = name, val
-  end
-
-  def eval(scope)
-    @val
-  end
-end
-
-class StringNode
-  def initialize(val)
-    @val = val
-  end
-
-  def eval(scope)
-    @val
-  end
-end
-
-class BoolNode
-  def initialize(val)
-    @val = val
-  end
-
-  def eval(scope)
-    @val
-  end
-end
-
-class ListNode
-  def initialize(val)
-    @val = val
-  end
-
-  def eval(scope)
-    @val
-  end
-end
-
-# This function will, given a value, ``calculate'' whether it's true or false.
-def value_to_boolean(value, scope)
-  case value.is_a?
-  when IdentifierNode
-    val = scope.get_var(value.name)
-    if val
-    end
-  when IntegerNode
-  when FloatNode
-  when StringNode
-  when BoolNode
-  when ListNode
+  def get_val(scope)
+    @value.eval(scope)
   end
 end
 
 # Boolean statements and Numerical statements
+
+# Nice solution to a later problem
+oper_to_func = {"ge" => :>=, "gt" => :>, "le" => :<=,
+  "lt" => :<, "eq" => :==}
+
+# This function will, given a value, ``calculate'' whether it's true or false.
+def val_to_bool(value, scope)
+  case value.is_a?
+  when IdentifierNode
+    identifier = scope.get_var(value.name)
+    # Next time value_to_boolean() evaluates it won't have a IdentifierNode
+    return value_to_boolean(identifier.get_val(scope), scope)
+  when IntegerNode
+    return value.eval(scope) > 0
+  when FloatNode
+    # Doesn't make a lot of sense. Provided as a convenience.
+    return value.eval(scope) > 0
+  when StringNode
+    # Convenience.
+    return value.eval(scope).size > 0
+  when BoolNode
+    # SHOULD already be a boolean value
+    return value.eval(scope)
+  when ListNode
+    return value.eval(scope).size > 0
+  end
+end
 
 class AndNode
   def initialize(op1, op2)
@@ -404,7 +412,7 @@ class AndNode
   def eval(scope)
     if @op1.is_a? 
     end
-    @op1.eval(scope) and @op2.eval(scope)
+    val_to_bool(@op1, scope) and val_to_bool(@op2, scope)
   end
 end
 
@@ -414,7 +422,7 @@ class OrNode
   end
 
   def eval(scope)
-    @op1.eval(scope) or @op2.eval(scope)
+    val_to_bool(@op1, scope) or val_to_bool(@op2, scope)
   end
 end
 
@@ -424,7 +432,7 @@ class NotNode
   end
 
   def eval(scope)
-    not @op1.eval(scope)
+    not val_to_bool(@op1, scope)
   end
 end
 
@@ -434,60 +442,75 @@ class ComparisonNode
   end
 
   def eval(scope)
-    @op1.eval @oper @op2.eval
+    # Works like this:
+    # 1. get boolean value of @op1
+    # 2. We then use send to send the following parameters:
+    #     The first is a lookup of what operator to use
+    #     Then we get the boolean value and send this to the operator
+    # We are left with a boolean value which is returned
+    val_to_bool(@op1, scope).send(oper_to_func(@oper), val_to_bool(@op2, scope))
   end
 end
 
-class AddNode
-  def initialize(op1, op2)
-    @op1, @op2 = op1, op2
+class BinaryOperatorNode
+  def initialize(op1, oper, op2)
+    @op1, @oper, @op2 = op1, oper, op2
   end
 
   def eval(scope)
-    @op1.eval + @op2.eval
+    @op1.eval(scope).send(@oper, @op2.eval(scope))
   end
 end
 
-# TODO: type safety. here?
-
-class SubtractNode
+class AddNode < BinaryOperatorNode
   def initialize(op1, op2)
-    @op1, @op2 = op1, op2
+    super(op1, :+, op2)
+  end
+end
+
+class SubtractNode < BinaryOperatorNode
+  def initialize(op1, op2)
+    super(op1, :-, op2)
+  end
+end
+
+class MultiplyNode < BinaryOperatorNode
+  def initialize(op1, op2)
+    super(op1, :*, op2)
+  end
+end
+
+class DivisionNode < BinaryOperatorNode
+  def initialize(op1, op2)
+    super(op1, :/, op2)
+  end
+end
+
+class PowerNode < BinaryOperatorNode
+  def initialize(op1, op2)
+    super(op1, :**, op2)
+  end
+end
+
+class UnaryOperatorNode
+  def initialize(op1, oper)
+    @op1, @oper = op1, oper
   end
 
   def eval(scope)
-    @op1.eval - @op2.eval
+    @op1.send(@oper)
   end
 end
 
-class MultiplyNode
-  def initialize(op1, op2)
-    @op1, @op2 = op1, op2
-  end
-
-  def eval(scope)
-    @op1.eval * @op2.eval
+class UnaryPlusNode < UnaryOperatorNode
+  def initialize(op1)
+    super(op1, :+@)
   end
 end
 
-class DivisionNode
-  def initialize(op1, op2)
-    @op1, @op2 = op1, op2
-  end
-
-  def eval(scope)
-    @op1.eval / @op2.eval
+class UnaryMinusNode < UnaryOperatorNode
+def initialize(op1)
+    super(op1, :-@)
   end
 end
 
-class UnaryPlusNode
-
-end
-
-class UnaryMinusNode
-
-end
-
-class PowerNode
-
-end
