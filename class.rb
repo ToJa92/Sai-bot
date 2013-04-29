@@ -13,7 +13,7 @@ end
 class Scope
   # Ugly solution, might be able to fix it later
   attr_accessor :scope_var, :scope_func, :parent
-  
+
   def initialize(parent = nil)
     @scope_var, @scope_func = {}, {}, parent
   end
@@ -21,34 +21,41 @@ class Scope
   def add_var(var)
     if $debug then
       temp = self
-      while not temp.nil? and not temp.scope_var.has_key? var.name do
+      while not temp.parent.nil? and not temp.scope_var.has_key? var.name do
         temp = temp.parent
       end
       if temp != nil and temp != self then
         puts "Shadowing variable #{var.name} from previous scope"
       end
     end
-    @scope_var[var.name] = var.value
+    @scope_var[var.name] = var
   end
 
   def get_var(name)
-    temp = self
+    # We start searching from ourselves
+    scope = self
+    # We're not interested in the NameNode object, but rather the string
+    name = name.eval
     # dynamic scope, iterate backwards through scopes until we find the variable
-    while not temp.nil? and not temp.scope_var.has_key? name do
-      temp = temp.parent
+    while not scope.parent.nil? and not scope.scope_var.has_key? name do
+      scope = scope.parent
     end
 
     # if we have the key, we return it.
     # if we don't, we know we've iterated to nil and we can raise an exception
-    if temp.scope_var.has_key? name then
-      return temp.scope_var[name]
+    if scope.scope_var.has_key? name then
+      puts "get_var: #{scope.scope_var}"
+      puts "get_var: #{scope.scope_var[name].class}"
+      return scope.scope_var[name]
     end
 
     raise VarNotFound, "In Scope: Unable to find variable with name #{name}"
   end
 
+  # name will be a NameNode
   def update_var(name, value)
     temp = self
+    name = name.eval
     while not temp.parent.nil? and not temp.scope_var.has_key? name do
       temp = temp.parent
     end
@@ -73,6 +80,7 @@ class Scope
 
   def get_func(name)
     temp = self
+    name = name.eval
     # dynamic scope, iterate backwards through scopes until we find the variable
     while not temp.nil? and not temp.scope_func.has_key? name do
       temp = temp.parent
@@ -91,12 +99,12 @@ end
 # A helper function that takes a scope and a variable as a argument.
 # Will return a value based on the type of object, or nil if there is no value.
 def get_var(scope, var)
-  if var.is_a? IdentifierNode then
-    return scope.get_var(var.name)
+  if var.is_a? NameNode then
+    return scope.get_var(var)
   elsif (var.is_a? IntegerNode) or (var.is_a? FloatNode) then
     return var.eval(scope)
   end
-  
+
   return nil
 end
 
@@ -124,7 +132,7 @@ class PrintNode
 
   def eval(scope)
     @input.each do |stmt|
-      val = get_var(scope, stmt);
+      val = scope.get_var(stmt)
       puts(val.eval(scope)) if val
     end
   end
@@ -136,10 +144,32 @@ class InputNode
     @input = input
   end
 
+  # TODO: Get previous type of the variable so that we save the correct type
   def eval(scope)
     @input.each do |stmt|
+      old_val = scope.get_var(stmt)
       puts "-----INPUT-----" if $debug
-      user_input = gets
+      invalid = 1
+      while invalid do
+        begin
+          user_input = gets
+          case old_val.value.class
+          when IntegerNode
+            new_node = IdentifierNode.new(old_val.name, "int", Integer(user_input)
+          when FloatNode
+
+          when StringNode
+
+          when BoolNode
+
+          when ListNode
+
+          end
+
+        rescue ArgumentError
+          puts "Invalid value."
+        end
+      end
       scope.update_var(stmt, user_input)
     end
   end
@@ -308,7 +338,7 @@ class ReturnNode
   def initialize(expr)
     @expr = expr
   end
-  
+
   def eval(scope)
     #getCurrScopeFunc.return?
   end
@@ -325,10 +355,9 @@ class ValueNode
 
   def eval(scope)
     @val
-  end  
+  end
 end
 
-# TODO: to_string in every class, so that print works
 class IntegerNode < ValueNode
 end
 
@@ -344,8 +373,16 @@ end
 class ListNode < ValueNode
 end
 
-# TODO: Type should determine what type of object to create, and save the object
-#       in its value.
+class NameNode
+  def initialize(name)
+    @name = name
+  end
+
+  def eval
+    @name
+  end
+end
+
 class IdentifierNode
   attr_reader :name, :value
 
@@ -410,7 +447,7 @@ class AndNode
   end
 
   def eval(scope)
-    if @op1.is_a? 
+    if @op1.is_a?
     end
     val_to_bool(@op1, scope) and val_to_bool(@op2, scope)
   end
@@ -513,4 +550,3 @@ def initialize(op1)
     super(op1, :-@)
   end
 end
-
