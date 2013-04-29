@@ -87,3 +87,7 @@ Tog bort en dubblett av InsertNode. NameNode är nu skapad och den innehåller
 Jag skapade NameNode som nu används överallt för att representera variabelnamn.
     Jag fick även implementera metoderna eql?() och hash() för att uppslagningen
     i hashtabellen för variabelnamn skulle fungera.
+Passade på att göra om de booleska klasserna så de ärver av en gemensam klass.
+Jag har även fixat till AtNode, InsertNode, PrintNode och InputNode nu så att
+    de fungerar. Arbetet fortsätter med fler listnoder. Därefter ska parsern
+    integereras.

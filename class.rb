@@ -48,7 +48,7 @@ class Scope
       scope.scope_var.has_key? name
     return scope.scope_var[name] if scope.scope_var.has_key? name
 
-    raise VarNotFound, "In Scope: Unable to find variable with name #{name}"
+    raise VarNotFound, "Unable to find variable with name #{name.inspect}"
   end
 
   # name will be a NameNode
@@ -104,7 +104,11 @@ end
 def get_var(scope, var)
   if var.is_a? NameNode then
     return scope.get_var(var)
-  elsif (var.is_a? IntegerNode) or (var.is_a? FloatNode) then
+  elsif var.is_a? IdentifierNode then
+    return scope.get_var(var)
+  elsif var.is_a? ValueNode then
+    return var.eval(scope)
+  else
     return var.eval(scope)
   end
 
@@ -135,9 +139,11 @@ class PrintNode
 
   def eval(scope)
     @input.each do |stmt|
-      val = scope.get_var(stmt)
       puts "-----PRINT-----" if $debug
-      puts(val.eval(scope)) if val
+      puts "before #{stmt.class}"
+      stmt = get_var(scope, stmt)
+      puts "after #{stmt.class}"
+      puts(get_var(scope, stmt)) if stmt
     end
   end
 end
@@ -181,20 +187,22 @@ class InsertNode
   end
 
   def eval(scope)
-    new_list = get_var(scope, @id)
+    new_list = get_var(scope, @id).eval(scope)
     # new_list might be nil
     # new_list.size could be the new last index, so (size + 1) would be too much
-    if (not new_list.nil?) and (not index.nil?) and
+    if (not new_list.nil?) and (not @index.nil?) and
         (@index.abs > (new_list.size + 1)) then
       raise(IndexError, "Index out of bounds")
     end
 
+    puts "\t#{new_list.class} #{new_list.inspect}"
+
     if new_list.nil? then
       new_list = [@expr.eval(scope)]
-    elsif index then
-      new_list.insert(@index, @expr.eval(scope))
+    elsif @index then
+      new_list.insert(@index, get_var(scope, @expr))
     else
-      new_list.insert(new_list.size, @expr.eval(scope))
+      new_list.insert(new_list.size, get_var(scope, @expr))
     end
 
     scope.update_var(@id, new_list)
@@ -224,9 +232,11 @@ class AtNode
   end
 
   def eval(scope)
-    new_list = get_var(scope, @id)
-    raise IndexError, "Index out of bounds" if @index.abs > new_list.size
-    return new_list[@index]
+    new_list = get_var(scope, @id).eval(scope)
+    num_index = get_var(scope, @index).eval(scope)
+    puts "index: #{@index.inspect}, num_index: #{num_index.inspect}"
+    raise IndexError, "Index out of bounds" if num_index.abs > new_list.size - 1
+    return new_list[num_index]
   end
 end
 
@@ -340,6 +350,10 @@ class ValueNode
     @val = val
   end
 
+  def to_s
+    @val
+  end
+
   def eval(scope)
     @val
   end
@@ -411,14 +425,10 @@ end
 
 # Boolean statements and Numerical statements
 
-# Nice solution to a later problem
-oper_to_func = {"ge" => :>=, "gt" => :>, "le" => :<=,
-  "lt" => :<, "eq" => :==}
-
 # This function will, given a value, ``calculate'' whether it's true or false.
 def val_to_bool(value, scope)
   case value.is_a?
-  when IdentifierNode
+  when NameNode
     identifier = scope.get_var(value.name)
     # Next time value_to_boolean() evaluates it won't have a IdentifierNode
     return value_to_boolean(identifier.get_val(scope), scope)
@@ -438,43 +448,11 @@ def val_to_bool(value, scope)
   end
 end
 
-class AndNode
-  def initialize(op1, op2)
-    @op1, @op2 = op1, op2
-  end
-
-  def eval(scope)
-    if @op1.is_a?
-    end
-    val_to_bool(@op1, scope) and val_to_bool(@op2, scope)
-  end
-end
-
-class OrNode
-  def initialize(op1, op2)
-    @op1, @op2 = op1, op2
-  end
-
-  def eval(scope)
-    val_to_bool(@op1, scope) or val_to_bool(@op2, scope)
-  end
-end
-
-class NotNode
-  def initialize(op1)
-    @op1 = op1
-  end
-
-  def eval(scope)
-    not val_to_bool(@op1, scope)
-  end
-end
-
-class ComparisonNode
+class BinaryBooleanNode
   def initialize(op1, oper, op2)
     @op1, @oper, @op2 = op1, oper, op2
   end
-
+  
   def eval(scope)
     # Works like this:
     # 1. get boolean value of @op1
@@ -482,7 +460,36 @@ class ComparisonNode
     #     The first is a lookup of what operator to use
     #     Then we get the boolean value and send this to the operator
     # We are left with a boolean value which is returned
-    val_to_bool(@op1, scope).send(oper_to_func(@oper), val_to_bool(@op2, scope))
+    val_to_bool(@op1, scope).send(@oper, val_to_bool(@op2, scope))
+  end
+end
+
+class AndNode < BooleanNode
+  def initialize(op1, op2)
+    super(op1, :&, op2)
+  end
+end
+
+class OrNode < BooleanNode
+  def initialize(op1, op2)
+    super(op1, :|, op2)
+  end
+end
+
+class UnaryBooleanNode
+  def initialize(op1, oper, op2)
+    @op1, @oper = op1, oper
+  end
+  
+  def eval(scope)
+    val_to_bool(@op1, scope).send(@oper)
+  end
+end
+
+
+class NotNode < UnaryBooleanNode
+  def initialize(op1)
+    super(op1, :!)
   end
 end
 
