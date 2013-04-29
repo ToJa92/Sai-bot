@@ -79,3 +79,11 @@ Nu är de unära och binära operatorerna konsoldierade så de ärver från en
 Vid en simpel testkörning hittade jag några småfel i koden som jag sedan rättade
     till. Det handlade mest om att jag inte evaluerade argument på rätt ställen.
 Att göra: en IdentifierNameNode som bara innehåller variabelnamn utan värde.
+
+2013-04-29
+----------
+Tog bort en dubblett av InsertNode. NameNode är nu skapad och den innehåller
+    endast ett variabelnamn.
+Jag skapade NameNode som nu används överallt för att representera variabelnamn.
+    Jag fick även implementera metoderna eql?() och hash() för att uppslagningen
+    i hashtabellen för variabelnamn skulle fungera.

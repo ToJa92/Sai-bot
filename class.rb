@@ -25,17 +25,17 @@ class Scope
         temp = temp.parent
       end
       if temp != nil and temp != self then
-        puts "Shadowing variable #{var.name} from previous scope"
+        puts "Shadowing variable #{var.name.eval} from previous scope"
       end
     end
-    @scope_var[var.name] = var
+    @scope_var[var.name] = var.value
+    puts "-----add_var-----" if $debug
+    puts "var #{var.name.inspect} with value #{var.value.inspect}" if $debug
   end
 
   def get_var(name)
     # We start searching from ourselves
     scope = self
-    # We're not interested in the NameNode object, but rather the string
-    name = name.eval
     # dynamic scope, iterate backwards through scopes until we find the variable
     while not scope.parent.nil? and not scope.scope_var.has_key? name do
       scope = scope.parent
@@ -43,11 +43,10 @@ class Scope
 
     # if we have the key, we return it.
     # if we don't, we know we've iterated to nil and we can raise an exception
-    if scope.scope_var.has_key? name then
-      puts "get_var: #{scope.scope_var}"
-      puts "get_var: #{scope.scope_var[name].class}"
-      return scope.scope_var[name]
-    end
+    puts "-----get_var-----" if $debug
+    puts "#{name.inspect} return #{scope.scope_var[name].inspect}" if $debug and
+      scope.scope_var.has_key? name
+    return scope.scope_var[name] if scope.scope_var.has_key? name
 
     raise VarNotFound, "In Scope: Unable to find variable with name #{name}"
   end
@@ -62,7 +61,11 @@ class Scope
     if $debug and temp != self then
       puts "Updated variable in older scope"
     end
-    temp.scope_var[name] = value
+    if not temp.nil? and temp.scope_var.has_key? name then
+      puts "-----update_var-----" if $debug
+      puts "updated #{name.inspect} with #{value.inspect}" if $debug
+      temp.scope_var[name] = value
+    end
   end
 
   def add_func(func)
@@ -133,6 +136,7 @@ class PrintNode
   def eval(scope)
     @input.each do |stmt|
       val = scope.get_var(stmt)
+      puts "-----PRINT-----" if $debug
       puts(val.eval(scope)) if val
     end
   end
@@ -153,41 +157,47 @@ class InputNode
       while invalid do
         begin
           user_input = gets
-          case old_val.value.class
-          when IntegerNode
-            new_node = IdentifierNode.new(old_val.name, "int", Integer(user_input)
-          when FloatNode
-
-          when StringNode
-
-          when BoolNode
-
-          when ListNode
-
+          if old_val.is_a? IntegerNode
+            new_node = IntegerNode.new(Integer(user_input))
+          elsif old_val.is_a? FloatNode
+            new_node = FloatNode.new(Float(user_input))
+          elsif old_val.is_a? StringNode
+            new_node = StringNode.new(String(user_input))
           end
-
-        rescue ArgumentError
-          puts "Invalid value."
+          invalid = nil
+        rescue ArgumentError => detail
+          puts detail.message
+          puts detail.backtrace
         end
       end
-      scope.update_var(stmt, user_input)
+      scope.update_var(NameNode.new(stmt), new_node)
     end
   end
 end
 
 class InsertNode
-  def initialize(id, expr)
-    @id = id
-    @expr = expr
+  def initialize(id, expr, index = nil)
+    @id, @expr, @index = id, expr, index
   end
 
   def eval(scope)
     new_list = get_var(scope, @id)
-    if new_list.is_a? ListNode then
-      new_list << expr.eval(scope)
-    else
-      raise TypeError, "Expected ListNode, got #{new_list.class}"
+    # new_list might be nil
+    # new_list.size could be the new last index, so (size + 1) would be too much
+    if (not new_list.nil?) and (not index.nil?) and
+        (@index.abs > (new_list.size + 1)) then
+      raise(IndexError, "Index out of bounds")
     end
+
+    if new_list.nil? then
+      new_list = [@expr.eval(scope)]
+    elsif index then
+      new_list.insert(@index, @expr.eval(scope))
+    else
+      new_list.insert(new_list.size, @expr.eval(scope))
+    end
+
+    scope.update_var(@id, new_list)
   end
 end
 
@@ -204,29 +214,6 @@ class RemoveNode
     # to select the element from the right side
     raise(IndexError, "Index out of bounds") if @index.abs > (new_list.size - 1)
     new_list.delete_at @index
-    scope.update_var(@id, new_list)
-  end
-end
-
-class InsertNode
-  def initialize(id, expr, index = nil)
-    @id, @expr, @index = id, expr, index
-  end
-
-  def eval(scope)
-    new_list = get_var(scope, @id)
-    # new_list might be nil
-    # new_list.size could be the new last index, so (size + 1) would be too much
-    if (not new_list.nil?) and (@index.abs > (new_list.size + 1)) then
-      raise(IndexError, "Index out of bounds")
-    end
-
-    if new_list.nil? then
-      new_list << @expr.eval(scope)
-    else
-      new_list.insert(@index, @expr.eval(scope))
-    end
-
     scope.update_var(@id, new_list)
   end
 end
@@ -374,8 +361,18 @@ class ListNode < ValueNode
 end
 
 class NameNode
+  attr_reader :name
+  
   def initialize(name)
     @name = name
+  end
+
+  def eql?(op2)
+    return @name == op2.name
+  end
+
+  def hash
+    return @name.hash
   end
 
   def eval
