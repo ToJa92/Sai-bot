@@ -15,7 +15,7 @@ class Scope
   attr_accessor :scope_var, :scope_func, :parent
 
   def initialize(parent = nil)
-    @scope_var, @scope_func = {}, {}, parent
+    @scope_var, @scope_func, @parent = {}, {}, parent
   end
 
   def add_var(var)
@@ -34,16 +34,19 @@ class Scope
   end
 
   def get_var(name)
+    puts "-----get_var-----" if $debug
+    puts "IN SCOPE" if $debug
     # We start searching from ourselves
-    scope = self
+    scope = self    
     # dynamic scope, iterate backwards through scopes until we find the variable
     while not scope.parent.nil? and not scope.scope_var.has_key? name do
       scope = scope.parent
     end
 
+    puts "inspection #{scope.inspect}"
+
     # if we have the key, we return it.
     # if we don't, we know we've iterated to nil and we can raise an exception
-    puts "-----get_var-----" if $debug
     puts "#{name.inspect} return #{scope.scope_var[name].inspect}" if $debug and
       scope.scope_var.has_key? name
     return scope.scope_var[name] if scope.scope_var.has_key? name
@@ -102,11 +105,18 @@ end
 # A helper function that takes a scope and a variable as a argument.
 # Will return a value based on the type of object, or nil if there is no value.
 def get_var(scope, var)
+  puts "in get_var()"
+  puts "var: #{var.inspect}"
   if var.is_a? NameNode then
-    return scope.get_var(var)
+    puts "namenode"
+    return get_var(scope, scope.get_var(var))
   elsif var.is_a? IdentifierNode then
-    return scope.get_var(var)
+    puts "identnode"
+    return get_var(scope, scope.get_var(var))
   elsif var.is_a? ValueNode then
+    puts "valuenode"
+    puts var.eval(scope).class
+    puts var.eval(scope)
     return var.eval(scope)
   else
     return var.eval(scope)
@@ -123,6 +133,12 @@ class ProgramRoot
   end
 
   def eval
+    puts "----------"
+    puts "begin eval in programroot"
+    puts "----------"
+    puts "\n\n\n"
+    puts @stmt_list
+    puts "\n\n\n"
     @stmt_list.each do |stmt|
       stmt.eval(@scope)
     end
@@ -140,10 +156,8 @@ class PrintNode
   def eval(scope)
     @input.each do |stmt|
       puts "-----PRINT-----" if $debug
-      puts "before #{stmt.class}"
       stmt = get_var(scope, stmt)
-      puts "after #{stmt.class}"
-      puts(get_var(scope, stmt)) if stmt
+      puts(stmt) if stmt
     end
   end
 end
@@ -256,8 +270,10 @@ class IfStmtNode
   end
 
   def eval(scope)
-    @child_scope = Scope(scope)
-    if @cond.eval then
+    @child_scope = Scope.new(scope)
+    puts "-----IFSTMTNODE-----"
+    puts "stmts: #{@stmts.inspect}"
+    if @cond.eval(@child_scope) then
       @stmts.each do |stmt|
         stmt.eval(@child_scope)
       end
@@ -337,7 +353,7 @@ class ReturnNode
   end
 
   def eval(scope)
-    #getCurrScopeFunc.return?
+    @expr.eval(scope)
   end
 end
 
@@ -355,6 +371,8 @@ class ValueNode
   end
 
   def eval(scope)
+    puts "in valuenode eval()"
+    puts "val: #{@val}"
     @val
   end
 end
@@ -397,20 +415,23 @@ end
 class IdentifierNode
   attr_reader :name, :value
 
+  # TODO: Type safety
   def initialize(name, type, value = nil)
     # Encapsulates the value in the appropriate node
-    case type
-    when "int"
-      value = IntegerNode.new(value)
-    when "float"
-      value = FloatNode.new(value)
-    when "string"
-      value = StringNode.new(value)
-    when "bool"
-      value = BoolNode.new(value)
-    when "list"
-      value = ListNode.new(value)
-    end
+    # if value then
+    #   case type
+    #   when "int"
+    #     value = IntegerNode.new(value)
+    #   when "float"
+    #     value = FloatNode.new(value)
+    #   when "string"
+    #     value = StringNode.new(value)
+    #   when "bool"
+    #     value = BoolNode.new(value)
+    #   when "list"
+    #     value = ListNode.new(value)
+    #   end
+    # end
     @name, @value = name, value
   end
 
@@ -464,13 +485,13 @@ class BinaryBooleanNode
   end
 end
 
-class AndNode < BooleanNode
+class AndNode < BinaryBooleanNode
   def initialize(op1, op2)
     super(op1, :&, op2)
   end
 end
 
-class OrNode < BooleanNode
+class OrNode < BinaryBooleanNode
   def initialize(op1, op2)
     super(op1, :|, op2)
   end
@@ -499,7 +520,10 @@ class BinaryOperatorNode
   end
 
   def eval(scope)
-    @op1.eval(scope).send(@oper, @op2.eval(scope))
+    puts @op1
+    puts @oper
+    puts @op2
+    get_var(scope, @op1).send(@oper, get_var(scope, @op2))
   end
 end
 
