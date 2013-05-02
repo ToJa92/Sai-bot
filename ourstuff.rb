@@ -21,6 +21,7 @@ class OurStuff
       token(/^,/){|m| m}
       token(/^{/){|m| m}
       token(/^}/){|m| m}
+      token(/^=/){|m| m}
       token(/^for/){|m| m}
       token(/^while/){|m| m}
       token(/^if/){|m| m}
@@ -58,21 +59,19 @@ class OurStuff
       token(/.*/)
 	  
       #  ---Parser---
-      start :input do
-        match(:stmt, :input) { |stmt, stmts|
-          puts "-----MATCH(:STMT,:INPUT)-----"
-          puts stmt.inspect
-          puts
-          puts stmts.inspect
-          ProgramRoot.new(([stmts] + [stmt]).reverse).eval
-        }
-        match(:stmt) { |stmt| stmt }
+      start :program do
+        match(:statements) {|stmts| ProgramRoot.new(stmts.reverse).eval }
+      end
+      
+      rule :statements do
+        match(:stmt, :statements) { |stmt, stmts| (stmts + [stmt]) }
+        match(:stmt) { |stmt| [stmt] }
       end
       
       rule :stmt do
         match(:for_stmt)
         match(:while_stmt)
-        match(:if_stmt)
+        match(:if_list)
         match(:print_stmt)
         match(:read_stmt)
         match(:ins_stmt)
@@ -94,35 +93,32 @@ class OurStuff
         match('<', 'while', ',', :expr, '>', :block) {|_, _, _, expr, _, block| WhileStmtNode.new(expr, block)}
       end
 
+      rule :if_list do
+        match(:if_stmt, :elseif_stmt, :else_stmt){ |if_stmt, elseif_list, else_stmt| IfElseifElseNode.new(if_stmt + elseif_list + else_stmt) }
+        match(:if_stmt, :elseif_stmt){ |if_stmt, elseif_list| IfElseifElseNode.new(if_stmt + elseif_list) }
+        match(:if_stmt, :else_stmt){ |if_stmt, else_stmt| IfElseifElseNode.new(if_stmt + else_stmt) }
+        match(:if_stmt){ |if_stmt| IfElseifElseNode.new(if_stmt) }
+      end
+
       rule :if_stmt do
-        match('<', 'if', ',', :expr, '>', :block, :elseif_stmt, :else_stmt) {|_, _, _, expr, _, block|IfStmtNode.new(expr, block)}
-        match('<', 'if', ',', :expr, '>', :block, :elseif_stmt){|_, _, _, expr, _, block|IfStmtNode.new(expr, block)}
-        match('<', 'if', ',', :expr, '>', :block, :else_stmt){|_, _, _, expr, _, block|IfStmtNode.new(expr, block)}
-        match('<', 'if', ',', :expr, '>', :block){|_, _, _, expr, _, block|
-          puts "-----MATCH IF EXPR BLOCK-----"
-          puts
-          puts block.inspect
-          puts
-          IfStmtNode.new(expr, block)
-        }
+        match('<', 'if', ',', :expr, '>', :block) { |_, _, _, expr, _, block| [IfStmtNode.new(expr, block)] }
       end
 
       rule :elseif_stmt do
-        match('<', 'elseif', ',', :expr, '>', :block) {||IfElseStmtNode.new()}
-        match('<', 'elseif', ',', :expr, '>', :block, :elseif_stmt) {|| IfElseStmtNode.new()}
-        match('<', 'elseif', ',', :expr, '>', :block, :else_stmt) {|| IfElseStmtNode.new()}
+        match('<', 'elseif', ',', :expr, '>', :block, :elseif_stmt) { |_, _, _, expr, _, block, elseif_stmts| elseif_stmts + [IfStmtNode.new(expr, block)].reverse }
+        match('<', 'elseif', ',', :expr, '>', :block) { |_, _, _, expr, _, block| [IfStmtNode.new(expr, block)] }
       end
 
       rule :else_stmt do
-        match('<', 'else', '>', :block) {|_, _, _, block| ElseStmtNode.new(block)}
+        match('<', 'else', '>', :block) {|_, _, _, block| [IfStmtNode.new(block)] }
       end
 
       rule :print_stmt do
-        match('<', 'print', ',', :atom, '>') {|_, _, _, a| PrintNode.new([a])}
+        match('<', 'print', ',', :expr, '>') {|_, _, _, a, _| PrintNode.new([a])}
       end
 
       rule :read_stmt do
-        match('<', 'read', ',', :identifier, '>') {|_, _, _, input| InputNode.new(input)}
+        match('<', 'read', ',', :identifier, '>') {|_, _, _, input, _| InputNode.new([input])}
       end
 
       rule :ins_stmt do
@@ -143,7 +139,7 @@ class OurStuff
       end
 
       rule :assign_stmt do
-        match('<', '=', :identifier, ',', :type, ',', :atom, '>') {|_, _, id, _, type, _, atom| IdentifierNode.new(id, type, atom);}
+        match('<', '=', ',', :identifier, ',', :expr, '>') {|_, _, _, id, _, expr, _| AssignmentNode.new(id, expr) }
       end
 
       rule :return_stmt do
@@ -178,7 +174,7 @@ class OurStuff
       end
 
       rule :declaration do
-        match('<', :type, ',', :identifier, ',', :atom, '>') { |_,type,_,identifier,_,expr| IdentifierNode.new(identifier, type, expr) }
+        match('<', :type, ',', :identifier, ',', :expr, '>') { |_,type,_,identifier,_,expr| IdentifierNode.new(identifier, type, expr) }
         match('<', :type, ',', :identifier, '>') { |_,type,_,identifier| IdentifierNode.new(identifier, type) }
       end
 
@@ -192,7 +188,7 @@ class OurStuff
           puts "-----RULE BLOCK_ITEM-----"
           puts "stmt: ", stmt.inspect
           puts "stmts: ", stmts.inspect
-          (stmts + [stmt]).reverse
+          ([stmt] + stmts)
         }
         match(:stmt, '}'){ |stmt,_| [stmt] }
       end
@@ -216,7 +212,7 @@ class OurStuff
         match(:num_expr, :comp_op,
               :num_expr){ |num1, op, num2|
           puts "#{num1} #{op} #{num2}"
-          BinaryOperatorNode.new(num1, op, num2) }
+          BinaryComparisonNode.new(num1, op, num2) }
         match(:num_expr)
       end
 
@@ -230,9 +226,9 @@ class OurStuff
       end
 
       rule :num_expr do
-        match(:term)
         match(:num, '+', :num) {|num1, _, num2| AddNode.new(num1, num2)}
         match(:num, '-', :num) {|num1, _, num2| SubtractNode.new(num1, num2)}
+        match(:term)
       end
 
       rule :num do
@@ -241,9 +237,9 @@ class OurStuff
       end
 
       rule :term do
-        match(:factor)
         match(:factor, '*', :factor) {|num1, _, num2| MultiplyNode.new(num1, num2)}
         match(:factor, '/', :factor) {|num1, _, num2| DivisionNode.new(num1, num2)}
+        match(:factor)
       end
 
       rule :factor do
@@ -254,15 +250,15 @@ class OurStuff
 
       rule :power do
         match(:atom, '**', :term) {|num1, _, num2| PowerNode.new(num1, num2)}
-        match(:stmt)
+        #match(:stmt)
         match(:atom)
       end
 
       rule :atom do
+        match(:string)
         match(:float)
         match(:integer)
         match(:bool)
-        match(:string)
         match(:identifier)
       end
 
@@ -302,6 +298,10 @@ class OurStuff
       puts "=> #{@ourParser.parse str}"
     end
   end
+
+  def parse(str)
+    puts "=> #{@ourParser.parse str}"
+  end
   
   def log(state = true)
     if state
@@ -312,6 +312,8 @@ class OurStuff
   end
 end
 
-while true do
-  OurStuff.new.prompt
-end
+# while true do
+#   OurStuff.new.prompt
+# end
+
+OurStuff.new.parse(File.read("test.ut"))

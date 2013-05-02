@@ -91,3 +91,21 @@ Passade på att göra om de booleska klasserna så de ärver av en gemensam klas
 Jag har även fixat till AtNode, InsertNode, PrintNode och InputNode nu så att
     de fungerar. Arbetet fortsätter med fler listnoder. Därefter ska parsern
     integereras.
+
+2013-04-30
+----------
+Integerade parsern med klasserna.
+    Vissa enklare saker funkar, som variabeldeklaration och if-satser
+    med ett villkor utan extra elseif/else.
+
+2013-05-02
+----------
+If-Elseif-Else-grenar fungerar nu. Tack till Per för hans upptäckt av en
+    smidig lösning.
+Räkningen fixades till genom att ändra lite på ordningen hos matchningarna.
+Fixade till så att program med endast ett statement fungerade.
+Föregående fix resulterade i att ordningen på alla statements blev fel.
+While-satser funkar nu. Tilldelning av variabler fungerar även det.
+While-satserna har uppdaterats för att faktiskt kunna hantera jämförelser
+    och liknande. Tidigare har det blivit lite konstiga fel, exempelvis
+    har den gått ett steg för långt

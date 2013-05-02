@@ -10,6 +10,9 @@ end
 class ObjAlreadyDefined < StandardError
 end
 
+class NoValueError < StandardError
+end
+
 class Scope
   # Ugly solution, might be able to fix it later
   attr_accessor :scope_var, :scope_func, :parent
@@ -34,16 +37,13 @@ class Scope
   end
 
   def get_var(name)
-    puts "-----get_var-----" if $debug
-    puts "IN SCOPE" if $debug
+    puts "-----GET_VAR IN SCOPE-----" if $debug
     # We start searching from ourselves
     scope = self    
     # dynamic scope, iterate backwards through scopes until we find the variable
     while not scope.parent.nil? and not scope.scope_var.has_key? name do
       scope = scope.parent
     end
-
-    puts "inspection #{scope.inspect}"
 
     # if we have the key, we return it.
     # if we don't, we know we've iterated to nil and we can raise an exception
@@ -57,13 +57,14 @@ class Scope
   # name will be a NameNode
   def update_var(name, value)
     temp = self
-    name = name.eval
+    #name = name.eval
     while not temp.parent.nil? and not temp.scope_var.has_key? name do
       temp = temp.parent
     end
     if $debug and temp != self then
       puts "Updated variable in older scope"
     end
+
     if not temp.nil? and temp.scope_var.has_key? name then
       puts "-----update_var-----" if $debug
       puts "updated #{name.inspect} with #{value.inspect}" if $debug
@@ -105,7 +106,7 @@ end
 # A helper function that takes a scope and a variable as a argument.
 # Will return a value based on the type of object, or nil if there is no value.
 def get_var(scope, var)
-  puts "in get_var()"
+  puts "-----GET_VAR() OUTSIDE SCOPE-----"
   puts "var: #{var.inspect}"
   if var.is_a? NameNode then
     puts "namenode"
@@ -115,9 +116,11 @@ def get_var(scope, var)
     return get_var(scope, scope.get_var(var))
   elsif var.is_a? ValueNode then
     puts "valuenode"
-    puts var.eval(scope).class
-    puts var.eval(scope)
     return var.eval(scope)
+  # elsif var.is_a? Fixnum then
+  #   return var
+  # elsif var.is_a? Array then
+  #   return var
   else
     return var.eval(scope)
   end
@@ -136,9 +139,8 @@ class ProgramRoot
     puts "----------"
     puts "begin eval in programroot"
     puts "----------"
-    puts "\n\n\n"
-    puts @stmt_list
-    puts "\n\n\n"
+    puts "\n"*50
+    puts @stmt_list, "\n"
     @stmt_list.each do |stmt|
       stmt.eval(@scope)
     end
@@ -157,7 +159,13 @@ class PrintNode
     @input.each do |stmt|
       puts "-----PRINT-----" if $debug
       stmt = get_var(scope, stmt)
-      puts(stmt) if stmt
+      puts "--------------------------------------------------"
+      if stmt.is_a? Array then
+        stmt.each { |item| puts item.eval(scope) }
+      else
+        puts(stmt) if stmt
+      end
+      puts "--------------------------------------------------"
     end
   end
 end
@@ -201,7 +209,8 @@ class InsertNode
   end
 
   def eval(scope)
-    new_list = get_var(scope, @id).eval(scope)
+    puts "-----INSERTNODE EVAL-----"
+    new_list = get_var(scope, @id)
     # new_list might be nil
     # new_list.size could be the new last index, so (size + 1) would be too much
     if (not new_list.nil?) and (not @index.nil?) and
@@ -216,10 +225,10 @@ class InsertNode
     elsif @index then
       new_list.insert(@index, get_var(scope, @expr))
     else
-      new_list.insert(new_list.size, get_var(scope, @expr))
+      new_list.insert(new_list.size, scope.get_var(@expr))
     end
 
-    scope.update_var(@id, new_list)
+    scope.update_var(@id, ListNode.new(new_list))
   end
 end
 
@@ -264,47 +273,44 @@ class LengthNode
   end
 end
 
+class IfElseifElseNode
+  def initialize(parts)
+    @parts = parts
+  end
+
+  def eval(scope)
+    @parts.each { |stmt|
+      break if (stmt.eval(scope) if stmt)      
+    }
+  end
+end
+
 class IfStmtNode
-  def initialize(cond, stmts)
+  def initialize(cond = nil, stmts)
     @cond, @stmts = cond, stmts
   end
 
   def eval(scope)
     @child_scope = Scope.new(scope)
-    puts "-----IFSTMTNODE-----"
-    puts "stmts: #{@stmts.inspect}"
-    if @cond.eval(@child_scope) then
+    # if the IfNode has a condition. else-branch will have a empty condition
+    # and is always last in the code.
+    if @cond then
+      # If the condition is evaluated to true
+      if @cond.eval(@child_scope) then
+        @stmts.each do |stmt|
+          stmt.eval(@child_scope)
+        end
+        # Will break the chain of if-elseif-...-elseif-else
+        return true
+      else
+        # Continue with next elseif/else
+        return false
+      end
+    else
+      # We've reached the else-branch
       @stmts.each do |stmt|
         stmt.eval(@child_scope)
       end
-    end
-  end
-end
-
-class IfElseStmtNode
-  def initialize(cond, stmts)
-    @cond, @stmts = cond, stmts
-  end
-
-  def eval(scope)
-    @child_scope = Scope(scope)
-    if @cond.eval then
-      @stmts.each do |stmt|
-        stmt.eval(@child_scope)
-      end
-    end
-  end
-end
-
-class ElseStmtNode
-  def initialize(stmts)
-    @stmts = stmts
-  end
-
-  def eval(scope)
-    @child_scope = Scope(scope)
-    @stmts.each do |stmt|
-      stmt.eval(@child_scope)
     end
   end
 end
@@ -335,8 +341,11 @@ class WhileStmtNode
   end
 
   def eval(scope)
-    @new_scope = Scope(scope)
+    @new_scope = Scope.new(scope)
     while @expr.eval(@new_scope) do
+      #puts "-----IN WHILESTMTNODE EVAL-----"
+      #puts "expr eval: #{@expr.eval(@new_scope)}"
+      #sleep(5)
       @stmts.each do |stmt|
         stmt.eval(@new_scope)
       end
@@ -357,12 +366,24 @@ class ReturnNode
   end
 end
 
+class AssignmentNode
+  def initialize(name, val)
+    @name, @val = name, val
+  end
+
+  def eval(scope)
+    puts "-----ASSIGNMENT EVAL-----"
+    new_val = @val.eval(scope)
+    puts "new_val: #{new_val.inspect}"
+    scope.update_var(@name, new_val)
+  end
+end
+
 # Data types
 
 # A simple, constant node
 class ValueNode
   def initialize(val = nil)
-    raise ArgumentError, "Can't make a constant variable without val" if not val
     @val = val
   end
 
@@ -373,6 +394,7 @@ class ValueNode
   def eval(scope)
     puts "in valuenode eval()"
     puts "val: #{@val}"
+    raise NoValueError, "Attempted to use a variable without value" if @val.nil?
     @val
   end
 end
@@ -418,24 +440,26 @@ class IdentifierNode
   # TODO: Type safety
   def initialize(name, type, value = nil)
     # Encapsulates the value in the appropriate node
-    # if value then
-    #   case type
-    #   when "int"
-    #     value = IntegerNode.new(value)
-    #   when "float"
-    #     value = FloatNode.new(value)
-    #   when "string"
-    #     value = StringNode.new(value)
-    #   when "bool"
-    #     value = BoolNode.new(value)
-    #   when "list"
-    #     value = ListNode.new(value)
-    #   end
-    # end
+    if value.nil? then
+      case type
+      when "int"
+        value = IntegerNode.new(value)
+      when "float"
+        value = FloatNode.new(value)
+      when "string"
+        value = StringNode.new(value)
+      when "bool"
+        value = BoolNode.new(value)
+      when "list"
+        value = ListNode.new([])
+      end
+    end
     @name, @value = name, value
   end
 
   def eval(scope)
+    puts "-----IDENTIFIERNODE EVAL-----"
+    puts "adding: #{self.inspect}"
     scope.add_var(self)
   end
 
@@ -448,24 +472,37 @@ end
 
 # This function will, given a value, ``calculate'' whether it's true or false.
 def val_to_bool(value, scope)
-  case value.is_a?
-  when NameNode
-    identifier = scope.get_var(value.name)
-    # Next time value_to_boolean() evaluates it won't have a IdentifierNode
-    return value_to_boolean(identifier.get_val(scope), scope)
-  when IntegerNode
-    return value.eval(scope) > 0
-  when FloatNode
+  puts "-----VAL_TO_BOOL-----"
+  puts "value.class: #{value.class}"
+  res = nil
+  if value.is_a? NameNode then
+    # Next time value_to_boolean() evaluates it won't get a IdentifierNode
+    res = val_to_bool(scope.get_var(value), scope)
+  elsif value.is_a? IntegerNode then
+    res = value.eval(scope) > 0
+  elsif value.is_a? FloatNode then
     # Doesn't make a lot of sense. Provided as a convenience.
-    return value.eval(scope) > 0
-  when StringNode
+    res = value.eval(scope) > 0
+  elsif value.is_a? StringNode then
     # Convenience.
-    return value.eval(scope).size > 0
-  when BoolNode
+    res = value.eval(scope).size > 0
+  elsif value.is_a? BoolNode then
     # SHOULD already be a boolean value
-    return value.eval(scope)
-  when ListNode
-    return value.eval(scope).size > 0
+    res = value.eval(scope)
+  elsif value.is_a? ListNode then
+    res = value.eval(scope).size > 0
+  end
+  puts "res: #{res.inspect}"
+  return res
+end
+
+class BinaryComparisonNode
+    def initialize(op1, oper, op2)
+    @op1, @oper, @op2 = op1, oper, op2
+  end
+  
+  def eval(scope)
+    get_var(scope, @op1).send(@oper, get_var(scope, @op2))
   end
 end
 
@@ -520,10 +557,11 @@ class BinaryOperatorNode
   end
 
   def eval(scope)
-    puts @op1
-    puts @oper
-    puts @op2
-    get_var(scope, @op1).send(@oper, get_var(scope, @op2))
+    puts "-----BINARYOPERATORNODE EVAL-----"
+    puts "OP1 #{@op1.inspect}"
+    puts "OPER #{@oper.inspect}"
+    puts "OP2 #{@op2.inspect}"
+    IntegerNode.new(get_var(scope, @op1).send(@oper, get_var(scope, @op2)))
   end
 end
 
