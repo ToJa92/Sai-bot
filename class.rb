@@ -1,10 +1,14 @@
 # -*- coding: utf-8 -*-
 
 $debug = 1;
+require 'pp'
 
 # Define exceptions that will be used to signal errors
 
 class VarNotFound < StandardError
+end
+
+class FuncNotFound < StandardError
 end
 
 class ObjAlreadyDefined < StandardError
@@ -32,14 +36,14 @@ class Scope
       end
     end
     @scope_var[var.name] = var.value
-    puts "-----add_var-----" if $debug
-    puts "var #{var.name.inspect} with value #{var.value.inspect}" if $debug
+    puts "-----ADD_VAR IN SCOPE-----" if $debug
+    puts "added #{var.name.inspect} with value #{var.value.inspect}" if $debug
   end
 
   def get_var(name)
-    puts "-----GET_VAR IN SCOPE-----" if $debug
+    #puts "-----GET_VAR IN SCOPE-----" if $debug
     # We start searching from ourselves
-    scope = self    
+    scope = self
     # dynamic scope, iterate backwards through scopes until we find the variable
     while not scope.parent.nil? and not scope.scope_var.has_key? name do
       scope = scope.parent
@@ -47,8 +51,8 @@ class Scope
 
     # if we have the key, we return it.
     # if we don't, we know we've iterated to nil and we can raise an exception
-    puts "#{name.inspect} return #{scope.scope_var[name].inspect}" if $debug and
-      scope.scope_var.has_key? name
+   #puts "#{name.inspect} return #{scope.scope_var[name].inspect}" if $debug and
+      #scope.scope_var.has_key? name
     return scope.scope_var[name] if scope.scope_var.has_key? name
 
     raise VarNotFound, "Unable to find variable with name #{name.inspect}"
@@ -56,8 +60,8 @@ class Scope
 
   # name will be a NameNode
   def update_var(name, value)
+    puts "-----UPDATE VAR IN SCOPE-----" if $debug
     temp = self
-    #name = name.eval
     while not temp.parent.nil? and not temp.scope_var.has_key? name do
       temp = temp.parent
     end
@@ -66,7 +70,6 @@ class Scope
     end
 
     if not temp.nil? and temp.scope_var.has_key? name then
-      puts "-----update_var-----" if $debug
       puts "updated #{name.inspect} with #{value.inspect}" if $debug
       temp.scope_var[name] = value
     end
@@ -75,21 +78,20 @@ class Scope
   def add_func(func)
     if $debug then
       temp = self
-      while not temp.nil? and not temp.scope_func.has_key? func.name do
+      while not temp.parent.nil? and not temp.scope_func.has_key? func.name do
         temp = temp.parent
       end
       if temp != self then
         puts "Shadowing function #{func.name} from previous scope"
       end
     end
-    @scope_func[func.name] = [func.type, func.body]
+    @scope_func[func.id] = func
   end
 
   def get_func(name)
     temp = self
-    name = name.eval
     # dynamic scope, iterate backwards through scopes until we find the variable
-    while not temp.nil? and not temp.scope_func.has_key? name do
+    while not temp.parent.nil? and not temp.scope_func.has_key? name do
       temp = temp.parent
     end
 
@@ -99,7 +101,7 @@ class Scope
       return temp.scope_func[name]
     end
 
-    raise VarNotFound, "In Scope: Unable to find function with name #{name}"
+    raise FuncNotFound, "Scope: Couldn't find function #{name.inspect}"
   end
 end
 
@@ -114,15 +116,13 @@ def get_var(scope, var)
   elsif var.is_a? IdentifierNode then
     puts "identnode"
     return get_var(scope, scope.get_var(var))
-  elsif var.is_a? ValueNode then
-    puts "valuenode"
-    return var.eval(scope)
-  # elsif var.is_a? Fixnum then
-  #   return var
-  # elsif var.is_a? Array then
-  #   return var
+  elsif var.is_a? ValueNode or var.is_a? BinaryOperatorNode then
+    puts "valuenode or binaryoperatornode"
+    res = var
+    puts "returning #{res.inspect}"
+    return res
   else
-    return var.eval(scope)
+    return var
   end
 
   return nil
@@ -157,13 +157,14 @@ class PrintNode
 
   def eval(scope)
     @input.each do |stmt|
-      puts "-----PRINT-----" if $debug
+      puts "--------------------PRINT" if $debug
       stmt = get_var(scope, stmt)
-      puts "--------------------------------------------------"
       if stmt.is_a? Array then
         stmt.each { |item| puts item.eval(scope) }
+      elsif stmt.is_a? ValueNode then
+        puts(stmt.val)
       else
-        puts(stmt) if stmt
+        puts(stmt.eval(scope)) if stmt
       end
       puts "--------------------------------------------------"
     end
@@ -223,9 +224,9 @@ class InsertNode
     if new_list.nil? then
       new_list = [@expr.eval(scope)]
     elsif @index then
-      new_list.insert(@index, get_var(scope, @expr))
+      new_list.insert(@index, get_var(scope, @expr).eval(scope))
     else
-      new_list.insert(new_list.size, scope.get_var(@expr))
+      new_list.insert(new_list.size, get_var(scope, @expr).eval(scope))
     end
 
     scope.update_var(@id, ListNode.new(new_list))
@@ -235,28 +236,32 @@ end
 # A node handling removal of items from the built-in list
 # A index of -1 will remove the last item
 class RemoveNode
-  def initialize(id, index)
+  def initialize(id, index = nil)
     @id, @index = id, index
   end
 
   def eval(scope)
+    puts "-----REMOVENODE EVAL-----" if $debug
     new_list = get_var(scope, @id)
-    # array indexes can have a -(minus) prepended which will cause Ruby
-    # to select the element from the right side
-    raise(IndexError, "Index out of bounds") if @index.abs > (new_list.size - 1)
-    new_list.delete_at @index
+    if @index.nil? then
+      new_list.delete_at new_list.size -  1
+    else
+      temp = get_var(scope, @index)
+      raise(IndexError, "Out of bounds") if temp.abs > (new_list.size)
+      new_list.delete_at temp
+    end
     scope.update_var(@id, new_list)
   end
 end
 
 class AtNode
-  def initialize(id, index)
+  def initialize(id, index = nil)
     @id, @index = id, index
   end
 
   def eval(scope)
-    new_list = get_var(scope, @id).eval(scope)
-    num_index = get_var(scope, @index).eval(scope)
+    new_list = get_var(scope, @id)
+    num_index = if @index.nil?then new_list.size else get_var(scope, @index) end
     puts "index: #{@index.inspect}, num_index: #{num_index.inspect}"
     raise IndexError, "Index out of bounds" if num_index.abs > new_list.size - 1
     return new_list[num_index]
@@ -269,7 +274,7 @@ class LengthNode
   end
 
   def eval(scope)
-    get_var(scope, @id).size
+    IntegerNode.new(get_var(scope, @id).size)
   end
 end
 
@@ -280,7 +285,7 @@ class IfElseifElseNode
 
   def eval(scope)
     @parts.each { |stmt|
-      break if (stmt.eval(scope) if stmt)      
+      break if (stmt.eval(scope) if stmt)
     }
   end
 end
@@ -323,7 +328,7 @@ class ForStmtNode
 
   def eval(scope)
     # We want the execution to take place in its own scope
-    @new_scope = Scope(scope)
+    @new_scope = Scope.new(scope)
     @assign_stmt.eval(@new_scope)
     while @test_stmt.eval(@new_scope) do
       @stmts.each do |stmt|
@@ -366,6 +371,30 @@ class ReturnNode
   end
 end
 
+class IncrementNode
+  def initialize(id, incr_decr, expr = nil)
+    @id, @incr_decr, @expr = id, incr_decr, expr
+  end
+
+  def eval(scope)
+    puts "-----INCREMENTNODE EVAL-----" if $debug
+    old_val = scope.get_var(@id)
+    new_val = 0
+    case @incr_decr
+    when :pleq # plus equals(+=)
+      new_val = old_val.eval(scope) + @expr.eval(scope)
+    when :mieq # minus equals(-=)
+      new_val = old_val.eval(scope) - @expr.eval(scope)
+    when :mueq
+      new_val = old_val.eval(scope) * @expr.eval(scope)
+    when :dieq
+      new_val = old_val.eval(scope) / @expr.eval(scope)
+    end
+    new_val = old_val.class.new(new_val)
+    scope.update_var(@id, new_val)
+  end
+end
+
 class AssignmentNode
   def initialize(name, val)
     @name, @val = name, val
@@ -383,6 +412,8 @@ end
 
 # A simple, constant node
 class ValueNode
+  attr_reader :val
+
   def initialize(val = nil)
     @val = val
   end
@@ -414,9 +445,67 @@ end
 class ListNode < ValueNode
 end
 
+class FunctionNode
+  attr_reader :id, :ret_type, :idlist, :block
+  
+  def initialize(id, ret_type, idlist, block)
+    @id, @ret_type, @idlist, @block = id, ret_type, idlist, block
+  end
+
+  def eval(scope)
+    puts "-----FUNCTIONNODE EVAL-----" if $debug
+    scope.add_func(self)
+  end
+end
+
+class FuncCallNode
+  def initialize(id, args)
+    @id, @args = id, args
+  end
+
+  def eval(scope)
+    puts "-----FUNCCALLNDODE EVAL-----" if $debug
+    new_scope = Scope.new(scope)
+    func_obj = scope.get_func(@id)
+    raise(ArgumentError,
+          "Wrong number of arguments") if @args.size != func_obj.idlist.size
+    @args.zip(func_obj.idlist).each do |arg1, arg2|
+      #puts "arg1: #{arg1.inspect}", "arg2: #{arg2.inspect}"
+      arg1_t = if arg1.is_a? NameNode then
+                 puts "getting arg1 type"
+                 arg1.get_type(scope)
+               else
+                 arg1.eval(scope).class
+               end
+      arg2_t = arg2.value.class
+      raise(ArgumentError,
+            "type #{arg1_t} is not equal to #{arg2_t}") if arg1_t != arg2_t
+    end
+
+    puts "INSTANTIATING EMPTY VARIABLES"
+    puts "AND SETTING VALUES"
+
+    @args.zip(func_obj.idlist).each do |arg1,arg2|
+      puts "adding variable #{arg2.inspect}" if $debug
+      arg2.eval(new_scope)
+      arg1_v = scope.get_var(arg1)
+      puts "#{arg2.inspect} updated with #{arg1_v.inspect}"
+      new_scope.update_var(arg2.name, arg1_v)
+    end
+
+    puts "NEW_SCOPE"
+    PP.pp new_scope
+    puts "\n"*3
+
+    func_obj.block.each do |stmt|
+      stmt.eval(new_scope)
+    end
+  end
+end
+
 class NameNode
   attr_reader :name
-  
+
   def initialize(name)
     @name = name
   end
@@ -427,6 +516,10 @@ class NameNode
 
   def hash
     return @name.hash
+  end
+
+  def get_type(scope)
+    return scope.get_var(self).class
   end
 
   def eval
@@ -455,6 +548,10 @@ class IdentifierNode
       end
     end
     @name, @value = name, value
+  end
+
+  def ===(op2)
+    @name === op2.name
   end
 
   def eval(scope)
@@ -497,11 +594,17 @@ def val_to_bool(value, scope)
 end
 
 class BinaryComparisonNode
-    def initialize(op1, oper, op2)
+  def initialize(op1, oper, op2)
     @op1, @oper, @op2 = op1, oper, op2
   end
-  
+
   def eval(scope)
+    puts "-----BINARYCOMPARISON EVAL-----" if $debug
+    op1 = get_var(scope, @op1)
+    op2 = get_var(scope, @op2)
+    puts "ope1: #{op1.inspect}" if $debug
+    puts "oper: #{@oper.inspect}" if $debug
+    puts "ope2: #{op2.inspect}" if $debug
     get_var(scope, @op1).send(@oper, get_var(scope, @op2))
   end
 end
@@ -510,7 +613,7 @@ class BinaryBooleanNode
   def initialize(op1, oper, op2)
     @op1, @oper, @op2 = op1, oper, op2
   end
-  
+
   def eval(scope)
     # Works like this:
     # 1. get boolean value of @op1
@@ -538,7 +641,7 @@ class UnaryBooleanNode
   def initialize(op1, oper, op2)
     @op1, @oper = op1, oper
   end
-  
+
   def eval(scope)
     val_to_bool(@op1, scope).send(@oper)
   end
@@ -561,7 +664,9 @@ class BinaryOperatorNode
     puts "OP1 #{@op1.inspect}"
     puts "OPER #{@oper.inspect}"
     puts "OP2 #{@op2.inspect}"
-    IntegerNode.new(get_var(scope, @op1).send(@oper, get_var(scope, @op2)))
+    op1 = get_var(scope, @op1).eval(scope)
+    op2 = get_var(scope, @op2).eval(scope)
+    IntegerNode.new(get_var(scope, op1).send(@oper, get_var(scope, op2)))
   end
 end
 
@@ -612,7 +717,7 @@ class UnaryPlusNode < UnaryOperatorNode
 end
 
 class UnaryMinusNode < UnaryOperatorNode
-def initialize(op1)
+  def initialize(op1)
     super(op1, :-@)
   end
 end

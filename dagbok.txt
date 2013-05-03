@@ -108,4 +108,18 @@ Föregående fix resulterade i att ordningen på alla statements blev fel.
 While-satser funkar nu. Tilldelning av variabler fungerar även det.
 While-satserna har uppdaterats för att faktiskt kunna hantera jämförelser
     och liknande. Tidigare har det blivit lite konstiga fel, exempelvis
-    har den gått ett steg för långt
+    har den gått ett steg för långt.
+
+2013-05-03
+----------
+Lyckades fixa till en massa problem rörande de egna klasserna.
+Städade upp i RemoveNode så att den faktiskt fungerar utan index.
+For-loopar fungerar inte korrekt numera, uppåt går bra men nedåt så funkar det
+    inte riktigt som det ska.
+Fixade till AtNode samt InsertNode. InsertNode evaluerar nu sitt argument innan
+    det stoppas in i listan.
+For-loopen visade sig fungera bra vid närmare eftertanke. Den la till upp till
+    index 10, men tog bort ner till index 1.
+Har implementerat get_type i NameNode som returnerar namnets typ.
+Funktioner har implementerats och verkar vid ett preliminärt test fungera
+    korrekt.

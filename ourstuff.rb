@@ -57,36 +57,49 @@ class OurStuff
       token(/^\d+/){|i| i}
       #Just gathers up any possible leftovers(necessary?)
       token(/.*/)
-	  
+
       #  ---Parser---
       start :program do
         match(:statements) {|stmts| ProgramRoot.new(stmts.reverse).eval }
       end
-      
+
       rule :statements do
-        match(:stmt, :statements) { |stmt, stmts| (stmts + [stmt]) }
-        match(:stmt) { |stmt| [stmt] }
+        match(:statement, :statements) { |stmt, stmts| (stmts + [stmt]) }
+        match(:statement) { |stmt| [stmt] }
       end
-      
-      rule :stmt do
+
+      rule :statement do
+        match(:compound_statement)
+        match(:simple_statement)
+        match(:advanced_statement)
+      end
+
+      rule :compound_statement do
         match(:for_stmt)
         match(:while_stmt)
         match(:if_list)
+      end
+
+      rule :simple_statement do
+        match(:at_stmt)
+        match(:len_stmt)
+      end
+
+      rule :advanced_statement do
+        match(:declaration)
         match(:print_stmt)
         match(:read_stmt)
         match(:ins_stmt)
         match(:rem_stmt)
         match(:func_stmt)
+        match(:func_call)
         match(:assign_stmt)
         match(:return_stmt)
-        match(:at_stmt)
-        match(:len_stmt)
         match(:inc_decr_stmt)
-        match(:declaration)
       end
 
       rule :for_stmt do
-        match('<', 'for', ',', :assign_stmt, ',', :expr, ',', :incr_decr_stmt, '>', :block){|_, _, _, assign, _, test, _, incr, _, block| ForStmtNode.new(assign, test, incr, block)}
+        match('<', 'for', ',', :declaration, ',', :expr, ',', :incr_decr_stmt, '>', :block){|_, _, _, assign, _, test, _, incr, _, block| ForStmtNode.new(assign, test, incr, block)}
       end
 
       rule :while_stmt do
@@ -127,15 +140,27 @@ class OurStuff
 
       rule :rem_stmt do
         match('<', 'rem', ',', :identifier, ',', :expr, '>') {|_, _, _, id, _, expr| RemoveNode.new(id, expr)}
+        match('<', 'rem', ',', :identifier, '>') {|_, _, _, id, _, expr| RemoveNode.new(id)}
       end
 
       rule :func_stmt do
-        match('<', 'func', ',', :identifier, ',', :type_list, '>', :block_stmt)
+        match('<', 'func', ',', :type, ',', :identifier, ',', :type_list, '>', :block){ |_, _, _,
+          type, _, id, _, args, _, block|
+          FunctionNode.new(id, type, args, block)
+        }
       end
-      
+
+      rule :func_call do
+        match('<', :identifier, ',', :atom_list, '>') { |_, id, _, args, _|
+          FuncCallNode.new(id, args)
+        }
+      end
+
       rule :type_list do
-        match(:type)
-        match(:type, ',', :type_list)
+        match(:declaration, ',', :type_list){ |decl, _, decls|
+          ([decl] + decls)
+        }
+        match(:declaration) { |decl| [decl] }
       end
 
       rule :assign_stmt do
@@ -147,22 +172,26 @@ class OurStuff
       end
 
       rule :at_stmt do
-        match('<', 'at', ',', :integer, ',', :identifier, '>') 
+        match('<', 'at', ',', :identifier, ',', :integer, '>') { |_, _, _, id, _, index, _|
+          AtNode.new(id, index)
+        }
       end
 
       rule :len_stmt do
         match('<', 'len', ',', :identifier, '>') {|_, _, _, id| LengthNode.new(id)}
       end
 
-      rule :inc_decr_stmt do
-        match('<', :incdecr_list, ',', :identifier, '>')
+      rule :incr_decr_stmt do
+        match('<', :incr_decr_list, ',', :identifier, ',', :expr, '>'){ |_, incr_decr, _, id, _, expr, _|
+          IncrementNode.new(id, incr_decr, expr)
+        }
       end
 
-      rule :incdecr_list do
-        match('x++')
-        match('++x')
-        match('x--')
-        match('--x')
+      rule :incr_decr_list do
+        match('+', '='){ |_| :pleq }
+        match('-', '='){ |_| :mieq }
+        match('*', '='){ |_| :mueq }
+        match('/', '='){ |_| :dieq }
       end
 
       rule :type do
@@ -183,14 +212,14 @@ class OurStuff
       end
 
       rule :block_item do
-        match(:stmt, :block_item) { |stmt, stmts|
+        match(:statement, :block_item) { |stmt, stmts|
           # [stmt] + [stmts][0,[stmts].size-1].reverse
           puts "-----RULE BLOCK_ITEM-----"
           puts "stmt: ", stmt.inspect
           puts "stmts: ", stmts.inspect
           ([stmt] + stmts)
         }
-        match(:stmt, '}'){ |stmt,_| [stmt] }
+        match(:statement, '}'){ |stmt,_| [stmt] }
       end
 
       rule :expr do
@@ -211,7 +240,6 @@ class OurStuff
       rule :comparison do
         match(:num_expr, :comp_op,
               :num_expr){ |num1, op, num2|
-          puts "#{num1} #{op} #{num2}"
           BinaryComparisonNode.new(num1, op, num2) }
         match(:num_expr)
       end
@@ -250,7 +278,7 @@ class OurStuff
 
       rule :power do
         match(:atom, '**', :term) {|num1, _, num2| PowerNode.new(num1, num2)}
-        #match(:stmt)
+        match(:simple_statement)
         match(:atom)
       end
 
@@ -261,6 +289,15 @@ class OurStuff
         match(:bool)
         match(:identifier)
       end
+
+      rule :atom_list do
+        match(:atom, ',', :atom_list){ |atom, _, atoms|
+          ([atom] + atoms)
+        }
+        match(:atom){ |atom| [atom] }
+      end
+
+
 
       rule :identifier do
         match(/[a-z]+[a-z_]*/){|m| NameNode.new(m) }
@@ -288,7 +325,7 @@ class OurStuff
   def done(str)
     ["quit","exit","bye",""].include?(str.chomp)
   end
-  
+
   def prompt
     print "[stuff] "
     str = gets
@@ -302,7 +339,7 @@ class OurStuff
   def parse(str)
     puts "=> #{@ourParser.parse str}"
   end
-  
+
   def log(state = true)
     if state
       @ourParser.logger.level = Logger::DEBUG
@@ -316,4 +353,6 @@ end
 #   OurStuff.new.prompt
 # end
 
-OurStuff.new.parse(File.read("test.ut"))
+a = OurStuff.new
+a.log true
+a.parse(File.read("test.ut"))
