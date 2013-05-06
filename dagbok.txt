@@ -123,3 +123,9 @@ For-loopen visade sig fungera bra vid närmare eftertanke. Den la till upp till
 Har implementerat get_type i NameNode som returnerar namnets typ.
 Funktioner har implementerats och verkar vid ett preliminärt test fungera
     korrekt.
+
+2013-05-06
+----------
+to_s i ValueNode visade sig innehålla ett ``litet'' fel: den returnerade inte en
+     sträng utan ett objekt.
+Fixade till så att debugutskrifter endast exekveras om $debug är satt till true.

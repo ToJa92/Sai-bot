@@ -337,7 +337,7 @@ class OurStuff
   end
 
   def parse(str)
-    puts "=> #{@ourParser.parse str}"
+    @ourParser.parse str
   end
 
   def log(state = true)

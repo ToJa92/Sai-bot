@@ -32,12 +32,12 @@ class Scope
         temp = temp.parent
       end
       if temp != nil and temp != self then
-        puts "Shadowing variable #{var.name.eval} from previous scope"
+        puts "Shadowing variable #{var.name.eval} from previous scope" if $debug
       end
     end
     @scope_var[var.name] = var.value
-    puts "-----ADD_VAR IN SCOPE-----" if $debug
-    puts "added #{var.name.inspect} with value #{var.value.inspect}" if $debug
+    puts "-----ADD_VAR IN SCOPE-----" if $debug if $debug
+    puts "added #{var.name.inspect} with value #{var.value.inspect}" if $debug if $debug
   end
 
   def get_var(name)
@@ -60,17 +60,17 @@ class Scope
 
   # name will be a NameNode
   def update_var(name, value)
-    puts "-----UPDATE VAR IN SCOPE-----" if $debug
+    puts "-----UPDATE VAR IN SCOPE-----" if $debug if $debug
     temp = self
     while not temp.parent.nil? and not temp.scope_var.has_key? name do
       temp = temp.parent
     end
     if $debug and temp != self then
-      puts "Updated variable in older scope"
+      puts "Updated variable in older scope" if $debug
     end
 
     if not temp.nil? and temp.scope_var.has_key? name then
-      puts "updated #{name.inspect} with #{value.inspect}" if $debug
+      puts "updated #{name.inspect} with #{value.inspect}" if $debug if $debug
       temp.scope_var[name] = value
     end
   end
@@ -82,7 +82,7 @@ class Scope
         temp = temp.parent
       end
       if temp != self then
-        puts "Shadowing function #{func.name} from previous scope"
+        puts "Shadowing function #{func.name} from previous scope" if $debug
       end
     end
     @scope_func[func.id] = func
@@ -108,18 +108,18 @@ end
 # A helper function that takes a scope and a variable as a argument.
 # Will return a value based on the type of object, or nil if there is no value.
 def get_var(scope, var)
-  puts "-----GET_VAR() OUTSIDE SCOPE-----"
-  puts "var: #{var.inspect}"
+  puts "-----GET_VAR() OUTSIDE SCOPE-----" if $debug
+  puts "var: #{var.inspect}" if $debug
   if var.is_a? NameNode then
-    puts "namenode"
+    puts "namenode" if $debug
     return get_var(scope, scope.get_var(var))
   elsif var.is_a? IdentifierNode then
-    puts "identnode"
+    puts "identnode" if $debug
     return get_var(scope, scope.get_var(var))
   elsif var.is_a? ValueNode or var.is_a? BinaryOperatorNode then
-    puts "valuenode or binaryoperatornode"
+    puts "valuenode or binaryoperatornode" if $debug
     res = var
-    puts "returning #{res.inspect}"
+    puts "returning #{res.inspect}" if $debug
     return res
   else
     return var
@@ -136,11 +136,11 @@ class ProgramRoot
   end
 
   def eval
-    puts "----------"
-    puts "begin eval in programroot"
-    puts "----------"
-    puts "\n"*50
-    puts @stmt_list, "\n"
+    puts "----------" if $debug
+    puts "begin eval in programroot" if $debug
+    puts "----------" if $debug
+    puts "\n"*50 if $debug
+    puts @stmt_list, "\n" if $debug
     @stmt_list.each do |stmt|
       stmt.eval(@scope)
     end
@@ -162,11 +162,11 @@ class PrintNode
       if stmt.is_a? Array then
         stmt.each { |item| puts item.eval(scope) }
       elsif stmt.is_a? ValueNode then
-        puts(stmt.val)
+        puts(stmt)
       else
         puts(stmt.eval(scope)) if stmt
       end
-      puts "--------------------------------------------------"
+      puts "--------------------------------------------------" if $debug
     end
   end
 end
@@ -195,8 +195,8 @@ class InputNode
           end
           invalid = nil
         rescue ArgumentError => detail
-          puts detail.message
-          puts detail.backtrace
+          puts detail.message if $debug
+          puts detail.backtrace if $debug
         end
       end
       scope.update_var(NameNode.new(stmt), new_node)
@@ -210,7 +210,7 @@ class InsertNode
   end
 
   def eval(scope)
-    puts "-----INSERTNODE EVAL-----"
+    puts "-----INSERTNODE EVAL-----" if $debug
     new_list = get_var(scope, @id)
     # new_list might be nil
     # new_list.size could be the new last index, so (size + 1) would be too much
@@ -219,7 +219,7 @@ class InsertNode
       raise(IndexError, "Index out of bounds")
     end
 
-    puts "\t#{new_list.class} #{new_list.inspect}"
+    puts "\t#{new_list.class} #{new_list.inspect}" if $debug
 
     if new_list.nil? then
       new_list = [@expr.eval(scope)]
@@ -262,7 +262,7 @@ class AtNode
   def eval(scope)
     new_list = get_var(scope, @id)
     num_index = if @index.nil?then new_list.size else get_var(scope, @index) end
-    puts "index: #{@index.inspect}, num_index: #{num_index.inspect}"
+    puts "index: #{@index.inspect}, num_index: #{num_index.inspect}" if $debug
     raise IndexError, "Index out of bounds" if num_index.abs > new_list.size - 1
     return new_list[num_index]
   end
@@ -401,9 +401,9 @@ class AssignmentNode
   end
 
   def eval(scope)
-    puts "-----ASSIGNMENT EVAL-----"
+    puts "-----ASSIGNMENT EVAL-----" if $debug
     new_val = @val.eval(scope)
-    puts "new_val: #{new_val.inspect}"
+    puts "new_val: #{new_val.inspect}" if $debug
     scope.update_var(@name, new_val)
   end
 end
@@ -419,12 +419,12 @@ class ValueNode
   end
 
   def to_s
-    @val
+    "#{@val}"
   end
 
   def eval(scope)
-    puts "in valuenode eval()"
-    puts "val: #{@val}"
+    puts "in valuenode eval()" if $debug
+    puts "val: #{@val}" if $debug
     raise NoValueError, "Attempted to use a variable without value" if @val.nil?
     @val
   end
@@ -472,7 +472,7 @@ class FuncCallNode
     @args.zip(func_obj.idlist).each do |arg1, arg2|
       #puts "arg1: #{arg1.inspect}", "arg2: #{arg2.inspect}"
       arg1_t = if arg1.is_a? NameNode then
-                 puts "getting arg1 type"
+                 puts "getting arg1 type" if $debug
                  arg1.get_type(scope)
                else
                  arg1.eval(scope).class
@@ -482,20 +482,20 @@ class FuncCallNode
             "type #{arg1_t} is not equal to #{arg2_t}") if arg1_t != arg2_t
     end
 
-    puts "INSTANTIATING EMPTY VARIABLES"
-    puts "AND SETTING VALUES"
+    puts "INSTANTIATING EMPTY VARIABLES" if $debug
+    puts "AND SETTING VALUES" if $debug
 
     @args.zip(func_obj.idlist).each do |arg1,arg2|
       puts "adding variable #{arg2.inspect}" if $debug
       arg2.eval(new_scope)
       arg1_v = scope.get_var(arg1)
-      puts "#{arg2.inspect} updated with #{arg1_v.inspect}"
+      puts "#{arg2.inspect} updated with #{arg1_v.inspect}" if $debug
       new_scope.update_var(arg2.name, arg1_v)
     end
 
-    puts "NEW_SCOPE"
-    PP.pp new_scope
-    puts "\n"*3
+    puts "NEW_SCOPE" if $debug
+    PP.pp new_scope if $debug
+    puts "\n"*3 if $debug
 
     func_obj.block.each do |stmt|
       stmt.eval(new_scope)
@@ -555,8 +555,8 @@ class IdentifierNode
   end
 
   def eval(scope)
-    puts "-----IDENTIFIERNODE EVAL-----"
-    puts "adding: #{self.inspect}"
+    puts "-----IDENTIFIERNODE EVAL-----" if $debug
+    puts "adding: #{self.inspect}" if $debug
     scope.add_var(self)
   end
 
@@ -569,8 +569,8 @@ end
 
 # This function will, given a value, ``calculate'' whether it's true or false.
 def val_to_bool(value, scope)
-  puts "-----VAL_TO_BOOL-----"
-  puts "value.class: #{value.class}"
+  puts "-----VAL_TO_BOOL-----" if $debug
+  puts "value.class: #{value.class}" if $debug
   res = nil
   if value.is_a? NameNode then
     # Next time value_to_boolean() evaluates it won't get a IdentifierNode
@@ -589,7 +589,7 @@ def val_to_bool(value, scope)
   elsif value.is_a? ListNode then
     res = value.eval(scope).size > 0
   end
-  puts "res: #{res.inspect}"
+  puts "res: #{res.inspect}" if $debug
   return res
 end
 
@@ -660,10 +660,10 @@ class BinaryOperatorNode
   end
 
   def eval(scope)
-    puts "-----BINARYOPERATORNODE EVAL-----"
-    puts "OP1 #{@op1.inspect}"
-    puts "OPER #{@oper.inspect}"
-    puts "OP2 #{@op2.inspect}"
+    puts "-----BINARYOPERATORNODE EVAL-----" if $debug
+    puts "OP1 #{@op1.inspect}" if $debug
+    puts "OPER #{@oper.inspect}" if $debug
+    puts "OP2 #{@op2.inspect}" if $debug
     op1 = get_var(scope, @op1).eval(scope)
     op2 = get_var(scope, @op2).eval(scope)
     IntegerNode.new(get_var(scope, op1).send(@oper, get_var(scope, op2)))
