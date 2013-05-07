@@ -129,3 +129,14 @@ Funktioner har implementerats och verkar vid ett preliminärt test fungera
 to_s i ValueNode visade sig innehålla ett ``litet'' fel: den returnerade inte en
      sträng utan ett objekt.
 Fixade till så att debugutskrifter endast exekveras om $debug är satt till true.
+
+2013-05-07
+----------
+Jämförelser med BinaryComparisonNode fungerade inte korrekt eftersom
+     operatorerna inte evaluerades innan jämförelsen.
+Lade till get_val() som returnerar en datatyp inbyggd i Ruby.
+Skapade BooleanNode vars syfte är att "wrappa" expressions i if-satser.
+return bör fungera nu, men det blev inte särskilt snyggt. Man kan heller inte
+     nästla funktionsanrop.
+Grammatiken kanske har blivit lite konstigt, så jag commitar så man enklare kan
+     jämföra senare.

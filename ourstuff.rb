@@ -70,8 +70,8 @@ class OurStuff
 
       rule :statement do
         match(:compound_statement)
-        match(:simple_statement)
         match(:advanced_statement)
+        match(:simple_statement)
       end
 
       rule :compound_statement do
@@ -83,6 +83,7 @@ class OurStuff
       rule :simple_statement do
         match(:at_stmt)
         match(:len_stmt)
+        match(:func_call)
       end
 
       rule :advanced_statement do
@@ -92,7 +93,6 @@ class OurStuff
         match(:ins_stmt)
         match(:rem_stmt)
         match(:func_stmt)
-        match(:func_call)
         match(:assign_stmt)
         match(:return_stmt)
         match(:inc_decr_stmt)
@@ -114,12 +114,12 @@ class OurStuff
       end
 
       rule :if_stmt do
-        match('<', 'if', ',', :expr, '>', :block) { |_, _, _, expr, _, block| [IfStmtNode.new(expr, block)] }
+        match('<', 'if', ',', :expr, '>', :block) { |_, _, _, expr, _, block| [IfStmtNode.new(BooleanNode.new(expr), block)] }
       end
 
       rule :elseif_stmt do
-        match('<', 'elseif', ',', :expr, '>', :block, :elseif_stmt) { |_, _, _, expr, _, block, elseif_stmts| elseif_stmts + [IfStmtNode.new(expr, block)].reverse }
-        match('<', 'elseif', ',', :expr, '>', :block) { |_, _, _, expr, _, block| [IfStmtNode.new(expr, block)] }
+        match('<', 'elseif', ',', :expr, '>', :block, :elseif_stmt) { |_, _, _, expr, _, block, elseif_stmts| elseif_stmts + [IfStmtNode.new(BooleanNode.new(expr), block)].reverse }
+        match('<', 'elseif', ',', :expr, '>', :block) { |_, _, _, expr, _, block| [IfStmtNode.new(BooleanNode.new(expr), block)] }
       end
 
       rule :else_stmt do
@@ -254,19 +254,14 @@ class OurStuff
       end
 
       rule :num_expr do
-        match(:num, '+', :num) {|num1, _, num2| AddNode.new(num1, num2)}
-        match(:num, '-', :num) {|num1, _, num2| SubtractNode.new(num1, num2)}
+        match(:num_expr, '+', :term) {|num1, _, num2| AddNode.new(num1, num2)}
+        match(:num_expr, '-', :term) {|num1, _, num2| SubtractNode.new(num1, num2)}
         match(:term)
-      end
-
-      rule :num do
-        match(:term)
-        match(:num_expr)
       end
 
       rule :term do
-        match(:factor, '*', :factor) {|num1, _, num2| MultiplyNode.new(num1, num2)}
-        match(:factor, '/', :factor) {|num1, _, num2| DivisionNode.new(num1, num2)}
+        match(:term, '*', :factor) {|num1, _, num2| MultiplyNode.new(num1, num2)}
+        match(:term, '/', :factor) {|num1, _, num2| DivisionNode.new(num1, num2)}
         match(:factor)
       end
 

@@ -36,8 +36,9 @@ class Scope
       end
     end
     @scope_var[var.name] = var.value
-    puts "-----ADD_VAR IN SCOPE-----" if $debug if $debug
-    puts "added #{var.name.inspect} with value #{var.value.inspect}" if $debug if $debug
+    puts "-----ADD_VAR IN SCOPE-----" if $debug
+    puts "added #{var.name.inspect} with value" if $debug
+    PP.pp var.value if $debug
   end
 
   def get_var(name)
@@ -116,16 +117,26 @@ def get_var(scope, var)
   elsif var.is_a? IdentifierNode then
     puts "identnode" if $debug
     return get_var(scope, scope.get_var(var))
-  elsif var.is_a? ValueNode or var.is_a? BinaryOperatorNode then
-    puts "valuenode or binaryoperatornode" if $debug
-    res = var
-    puts "returning #{res.inspect}" if $debug
-    return res
   else
+    puts "returning #{var.inspect}" if $debug
     return var
   end
 
   return nil
+end
+
+# A helper function that gets the Ruby value of the object, if any
+def get_val(scope, var)
+  var = get_var(scope, var)
+  if var.is_a? ValueNode then
+    return var.eval(scope)
+  elsif var.is_a? BinaryOperatorNode then
+    return get_val(scope, var.eval(scope))
+  elsif var.is_a? Fixnum then
+    return var
+  else
+    raise ArgumentError, "get_val: Invalid type #{var.class}"
+  end
 end
 
 # ProgramRoot will act as the root node of the program tree
@@ -139,7 +150,8 @@ class ProgramRoot
     puts "----------" if $debug
     puts "begin eval in programroot" if $debug
     puts "----------" if $debug
-    puts "\n"*50 if $debug
+    PP.pp @stmt_list if $debug
+    puts "\n"*15 if $debug
     puts @stmt_list, "\n" if $debug
     @stmt_list.each do |stmt|
       stmt.eval(@scope)
@@ -301,7 +313,7 @@ class IfStmtNode
     # and is always last in the code.
     if @cond then
       # If the condition is evaluated to true
-      if @cond.eval(@child_scope) then
+      if @cond.eval(scope) then
         @stmts.each do |stmt|
           stmt.eval(@child_scope)
         end
@@ -470,16 +482,17 @@ class FuncCallNode
     raise(ArgumentError,
           "Wrong number of arguments") if @args.size != func_obj.idlist.size
     @args.zip(func_obj.idlist).each do |arg1, arg2|
-      #puts "arg1: #{arg1.inspect}", "arg2: #{arg2.inspect}"
+      puts "arg1: #{arg1.inspect}", "arg2: #{arg2.inspect}" if $debug
       arg1_t = if arg1.is_a? NameNode then
-                 puts "getting arg1 type" if $debug
                  arg1.get_type(scope)
                else
-                 arg1.eval(scope).class
+                 arg1.class
                end
       arg2_t = arg2.value.class
-      raise(ArgumentError,
-            "type #{arg1_t} is not equal to #{arg2_t}") if arg1_t != arg2_t
+      puts "#{arg1_t} == #{arg2_t} ?" if $debug
+      if arg1_t != arg2_t then
+        raise(ArgumentError, "incompatible types  #{arg1_t}, #{arg2_t}")
+      end
     end
 
     puts "INSTANTIATING EMPTY VARIABLES" if $debug
@@ -488,7 +501,7 @@ class FuncCallNode
     @args.zip(func_obj.idlist).each do |arg1,arg2|
       puts "adding variable #{arg2.inspect}" if $debug
       arg2.eval(new_scope)
-      arg1_v = scope.get_var(arg1)
+      arg1_v = get_val(scope, arg1)
       puts "#{arg2.inspect} updated with #{arg1_v.inspect}" if $debug
       new_scope.update_var(arg2.name, arg1_v)
     end
@@ -498,7 +511,11 @@ class FuncCallNode
     puts "\n"*3 if $debug
 
     func_obj.block.each do |stmt|
-      stmt.eval(new_scope)
+      if stmt.is_a? ReturnNode then
+        return stmt.eval(new_scope)
+      else
+        stmt.eval(new_scope)
+      end
     end
   end
 end
@@ -568,7 +585,7 @@ end
 # Boolean statements and Numerical statements
 
 # This function will, given a value, ``calculate'' whether it's true or false.
-def val_to_bool(value, scope)
+def val_to_bool(scope, value)
   puts "-----VAL_TO_BOOL-----" if $debug
   puts "value.class: #{value.class}" if $debug
   res = nil
@@ -588,6 +605,8 @@ def val_to_bool(value, scope)
     res = value.eval(scope)
   elsif value.is_a? ListNode then
     res = value.eval(scope).size > 0
+  else
+    raise ArgumentError, "Incompatible type #{value.class}"
   end
   puts "res: #{res.inspect}" if $debug
   return res
@@ -605,7 +624,25 @@ class BinaryComparisonNode
     puts "ope1: #{op1.inspect}" if $debug
     puts "oper: #{@oper.inspect}" if $debug
     puts "ope2: #{op2.inspect}" if $debug
-    get_var(scope, @op1).send(@oper, get_var(scope, @op2))
+    get_var(scope, @op1).eval(scope).send(@oper, get_var(scope, @op2).eval(scope))
+  end
+end
+
+class BooleanNode
+  def initialize(stmt)
+    @stmt = stmt
+  end
+
+  def eval(scope)
+    puts "-----BOOLEANNODE EVAL-----" if $debug
+    puts "@stmt: #{@stmt.class}" if $debug
+    if @stmt.is_a? BinaryComparisonNode then
+      return @stmt.eval(scope)
+    elsif @stmt.is_a? ValueNode then
+      return val_to_bool(scope, @stmt)
+    else
+      raise ArgumentError, "Invalid type: #{@stmt.class}"
+    end
   end
 end
 
@@ -621,7 +658,7 @@ class BinaryBooleanNode
     #     The first is a lookup of what operator to use
     #     Then we get the boolean value and send this to the operator
     # We are left with a boolean value which is returned
-    val_to_bool(@op1, scope).send(@oper, val_to_bool(@op2, scope))
+    val_to_bool(scope, @op1).send(@oper, val_to_bool(scope, @op2))
   end
 end
 
@@ -643,10 +680,9 @@ class UnaryBooleanNode
   end
 
   def eval(scope)
-    val_to_bool(@op1, scope).send(@oper)
+    val_to_bool(scope, @op1).send(@oper)
   end
 end
-
 
 class NotNode < UnaryBooleanNode
   def initialize(op1)
@@ -664,9 +700,16 @@ class BinaryOperatorNode
     puts "OP1 #{@op1.inspect}" if $debug
     puts "OPER #{@oper.inspect}" if $debug
     puts "OP2 #{@op2.inspect}" if $debug
-    op1 = get_var(scope, @op1).eval(scope)
-    op2 = get_var(scope, @op2).eval(scope)
-    IntegerNode.new(get_var(scope, op1).send(@oper, get_var(scope, op2)))
+    op1 = get_var(scope, @op1)
+    op2 = get_var(scope, @op2)
+    res = if op1.class == FloatNode or op2.class == FloatNode then
+            FloatNode
+          else
+            IntegerNode
+          end
+    res = res.new(get_val(scope, op1).send(@oper, get_val(scope, op2)))
+    puts "Returning res: #{res.inspect}" if $debug
+    return res
   end
 end
 
