@@ -132,7 +132,7 @@ def get_val(scope, var)
     return var.eval(scope)
   elsif var.is_a? BinaryOperatorNode then
     return get_val(scope, var.eval(scope))
-  elsif var.is_a? Fixnum then
+  elsif var.is_a? Fixnum or Float then
     return var
   else
     raise ArgumentError, "get_val: Invalid type #{var.class}"
@@ -175,8 +175,10 @@ class PrintNode
         stmt.each { |item| puts item.eval(scope) }
       elsif stmt.is_a? ValueNode then
         puts(stmt)
+      elsif stmt.respond_to? :eval then
+        puts(stmt.eval(scope))
       else
-        puts(stmt.eval(scope)) if stmt
+        puts(stmt)
       end
       puts "--------------------------------------------------" if $debug
     end
@@ -414,7 +416,7 @@ class AssignmentNode
 
   def eval(scope)
     puts "-----ASSIGNMENT EVAL-----" if $debug
-    new_val = @val.eval(scope)
+    new_val = get_var(scope, @val)
     puts "new_val: #{new_val.inspect}" if $debug
     scope.update_var(@name, new_val)
   end

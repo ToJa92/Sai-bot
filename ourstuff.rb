@@ -213,10 +213,6 @@ class OurStuff
 
       rule :block_item do
         match(:statement, :block_item) { |stmt, stmts|
-          # [stmt] + [stmts][0,[stmts].size-1].reverse
-          puts "-----RULE BLOCK_ITEM-----"
-          puts "stmt: ", stmt.inspect
-          puts "stmts: ", stmts.inspect
           ([stmt] + stmts)
         }
         match(:statement, '}'){ |stmt,_| [stmt] }
@@ -292,8 +288,6 @@ class OurStuff
         match(:atom){ |atom| [atom] }
       end
 
-
-
       rule :identifier do
         match(/[a-z]+[a-z_]*/){|m| NameNode.new(m) }
       end
@@ -307,7 +301,8 @@ class OurStuff
       end
 
       rule :string do
-        match(/"[^"]*"/) {|s| StringNode.new(s) }
+        # Not sure why this stopped working
+        match(/"[^"]*"/) {|s| StringNode.new(s[1,s.size-2]) }
       end
 
       rule :bool do
