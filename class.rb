@@ -322,7 +322,6 @@ class IfStmtNode
       # If the condition is evaluated to true
       if @cond.eval(scope) then
         @stmts.each do |stmt|
-          return stmt.eval(child_scope) if stmt.is_a? ReturnNode
           stmt.eval(child_scope)
         end
         # Will break the chain of if-elseif-...-elseif-else
@@ -334,7 +333,6 @@ class IfStmtNode
     else
       # We've reached the else-branch
       @stmts.each do |stmt|
-        return stmt.eval(child_scope) if stmt.is_a? ReturnNode
         stmt.eval(child_scope)
       end
     end
@@ -349,14 +347,14 @@ class ForStmtNode
 
   def eval(scope)
     # We want the execution to take place in its own scope
-    @new_scope = Scope.new(scope)
-    @assign_stmt.eval(@new_scope)
-    while @test_stmt.eval(@new_scope) do
+    new_scope = Scope.new(scope)
+    @assign_stmt.eval(new_scope)
+    while @test_stmt.eval(new_scope) do
       @stmts.each do |stmt|
-        stmt.eval(@new_scope)
+        stmt.eval(new_scope)
       end
       # eval @incr_expr after each loop as to (hopefully) avoid an infinite loop
-      @incr_expr.eval(@new_scope)
+      @incr_expr.eval(new_scope)
     end
   end
 end

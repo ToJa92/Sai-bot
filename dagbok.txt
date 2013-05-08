@@ -151,6 +151,10 @@ Först tänkte jag att man kunde returnera true från alla inbyggda funktioner n
 Därefter tänkte jag att man kan returnera själva ReturnNode, men då finns det
      en möjlighet att man inte kan evaluera den eftersom man då förlorar de
      scope som fanns där tidigare.
+Man skulle kunna tänka sig att man först evaluerar uttrycket, och returnerar
+     en ny ReturnNode med värdet.
 En tredje möjlighet är att returnera symboler och spara returvärdet i en global
      variabel men jag tycker inte att det verkar som en snygg lösning alls.
+En fjärde jättedålig möjlighet är att kasta ett exception med det värde som ska
+     returneras och sen fånga det.
      
