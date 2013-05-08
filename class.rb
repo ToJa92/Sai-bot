@@ -299,7 +299,12 @@ class IfElseifElseNode
 
   def eval(scope)
     @parts.each { |stmt|
-      break if (stmt.eval(scope) if stmt)
+      ret = stmt.eval(scope) if stmt
+      if not (ret.is_a? TrueClass or ret.is_a? FalseClass) then
+        puts "return from ifelseifelsenode"
+        return ret
+      end
+      break if ret
     }
   end
 end
@@ -310,14 +315,15 @@ class IfStmtNode
   end
 
   def eval(scope)
-    @child_scope = Scope.new(scope)
+    child_scope = Scope.new(scope)
     # if the IfNode has a condition. else-branch will have a empty condition
     # and is always last in the code.
     if @cond then
       # If the condition is evaluated to true
       if @cond.eval(scope) then
         @stmts.each do |stmt|
-          stmt.eval(@child_scope)
+          return stmt.eval(child_scope) if stmt.is_a? ReturnNode
+          stmt.eval(child_scope)
         end
         # Will break the chain of if-elseif-...-elseif-else
         return true
@@ -328,7 +334,8 @@ class IfStmtNode
     else
       # We've reached the else-branch
       @stmts.each do |stmt|
-        stmt.eval(@child_scope)
+        return stmt.eval(child_scope) if stmt.is_a? ReturnNode
+        stmt.eval(child_scope)
       end
     end
   end
@@ -508,13 +515,19 @@ class FuncCallNode
       new_scope.update_var(arg2.name, arg1_v)
     end
 
-    puts "NEW_SCOPE" if $debug
-    PP.pp new_scope if $debug
+    #puts "NEW_SCOPE" if $debug
+    #PP.pp new_scope if $debug
+    #puts "\n"*3 if $debug
+
+    puts "\n"*3 if $debug
+    puts "IN FUNCTION"
     puts "\n"*3 if $debug
 
     func_obj.block.each do |stmt|
       if stmt.is_a? ReturnNode then
-        return stmt.eval(new_scope)
+        res = stmt.eval(new_scope)
+        puts "returning #{res}"
+        return res
       else
         stmt.eval(new_scope)
       end
@@ -570,6 +583,7 @@ class IdentifierNode
   end
 
   def ===(op2)
+    raise TypeError, "Incompatible types #{self}!=#{op2}" unless op2.is_a? self
     @name === op2.name
   end
 
@@ -626,7 +640,19 @@ class BinaryComparisonNode
     puts "ope1: #{op1.inspect}" if $debug
     puts "oper: #{@oper.inspect}" if $debug
     puts "ope2: #{op2.inspect}" if $debug
-    get_var(scope, @op1).eval(scope).send(@oper, get_var(scope, @op2).eval(scope))
+    var1 = get_var(scope, @op1)
+    var2 = get_var(scope, @op2)
+    if var1.respond_to? :eval then
+      if var2.respond_to? :eval then # op1 and op2 has eval
+        return var1.eval(scope).send(@oper, var2.eval(scope))
+      else # op1 has eval but op2 does not
+        return var1.eval(scope).send(@oper, var2)
+      end
+    elsif var2.respond_to? :eval then # op1 does not have eval but op2 does
+      return var1.send(@oper, var2.eval(scope))
+    else # no operator has eval
+      return var1.send(@oper, var2)
+    end
   end
 end
 
@@ -704,6 +730,7 @@ class BinaryOperatorNode
     puts "OP2 #{@op2.inspect}" if $debug
     op1 = get_var(scope, @op1)
     op2 = get_var(scope, @op2)
+    # if one of the numbers are float, then the result will be float
     res = if op1.class == FloatNode or op2.class == FloatNode then
             FloatNode
           else

@@ -138,5 +138,19 @@ Lade till get_val() som returnerar en datatyp inbyggd i Ruby.
 Skapade BooleanNode vars syfte är att "wrappa" expressions i if-satser.
 return bör fungera nu, men det blev inte särskilt snyggt. Man kan heller inte
      nästla funktionsanrop.
-Grammatiken kanske har blivit lite konstigt, så jag commitar så man enklare kan
+Grammatiken kanske har blivit lite konstig, så jag commitar så man enklare kan
      jämföra senare.
+
+2013-05-08
+----------
+Försöker fixa return i if-satser. Går sådär.
+Insåg just att det skulle bli väldigt mycket jobb pga. av scopeningen.
+Först tänkte jag att man kunde returnera true från alla inbyggda funktioner när
+     de är klara och isåfall se om de inte returnerade true. Denna lösning bör
+     fungera, men blir inte särskilt snygg.
+Därefter tänkte jag att man kan returnera själva ReturnNode, men då finns det
+     en möjlighet att man inte kan evaluera den eftersom man då förlorar de
+     scope som fanns där tidigare.
+En tredje möjlighet är att returnera symboler och spara returvärdet i en global
+     variabel men jag tycker inte att det verkar som en snygg lösning alls.
+     
