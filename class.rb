@@ -213,7 +213,7 @@ class InputNode
           puts detail.backtrace if $debug
         end
       end
-      scope.update_var(NameNode.new(stmt), new_node)
+      scope.update_var(stmt, new_node)
     end
   end
 end
@@ -421,7 +421,7 @@ class AssignmentNode
 
   def eval(scope)
     puts "-----ASSIGNMENT EVAL-----" if $debug
-    new_val = get_var(scope, @val)
+    new_val = get_var(scope, @val).eval(scope)
     puts "new_val: #{new_val.inspect}" if $debug
     scope.update_var(@name, new_val)
   end

@@ -1,20 +1,12 @@
 require './rdparse'
 require './class.rb'
 
-
-##############################################################################
-#
-# Stuff and things
-#
-##############################################################################
-
 class OurStuff
   def initialize
     @ourParser = Parser.new("ourparse") do
-      #  ---Lexer---
-      #Finds all the strings
+      # Finds all the strings
       token(/^"[^"]*"/) {|s| s}
-      #Get rid of all the whitespaces
+      # Gets rid of all the whitespace
       token(/\s+/)
       token(/^</){|m| m}
       token(/^>/){|m| m}
@@ -51,11 +43,11 @@ class OurStuff
       token(/^true/){|m| m}
       token(/^false/){|m| m}
       token(/^[a-z]+[a-z_]*/){ |m| m }
-      #Finds all float/doubls and the likes.
+      # Finds all floating point numbers
       token(/^(\d+\.\d*)|(\d*\.\d+)/) {|f| f.to_f}
-      #Finds all integers.
+      # Finds all integers
       token(/^\d+/){|i| i}
-      #Just gathers up any possible leftovers(necessary?)
+      # Remove the rest
       token(/.*/)
 
       #  ---Parser---
@@ -99,55 +91,76 @@ class OurStuff
       end
 
       rule :for_stmt do
-        match('<', 'for', ',', :declaration, ',', :expr, ',', :incr_decr_stmt, '>', :block){|_, _, _, assign, _, test, _, incr, _, block| ForStmtNode.new(assign, test, incr, block)}
+        match('<', 'for', ',', :declaration, ',', :expr, ',',
+              :incr_decr_stmt, '>',
+              :block){|_, _, _, assign, _, test, _, incr, _, block|
+          ForStmtNode.new(assign, test, incr, block) }
       end
 
       rule :while_stmt do
-        match('<', 'while', ',', :expr, '>', :block) {|_, _, _, expr, _, block| WhileStmtNode.new(expr, block)}
+        match('<', 'while', ',', :expr, '>', :block){ |_, _, _, expr, _, block|
+          WhileStmtNode.new(expr, block) }
       end
 
       rule :if_list do
-        match(:if_stmt, :elseif_stmt, :else_stmt){ |if_stmt, elseif_list, else_stmt| IfElseifElseNode.new(if_stmt + elseif_list + else_stmt) }
-        match(:if_stmt, :elseif_stmt){ |if_stmt, elseif_list| IfElseifElseNode.new(if_stmt + elseif_list) }
-        match(:if_stmt, :else_stmt){ |if_stmt, else_stmt| IfElseifElseNode.new(if_stmt + else_stmt) }
+        match(:if_stmt, :elseif_stmt,
+              :else_stmt){ |if_stmt, elseif_list, else_stmt|
+          IfElseifElseNode.new(if_stmt + elseif_list + else_stmt) }
+        match(:if_stmt, :elseif_stmt){ |if_stmt, elseif_list|
+          IfElseifElseNode.new(if_stmt + elseif_list) }
+        match(:if_stmt, :else_stmt){ |if_stmt, else_stmt|
+          IfElseifElseNode.new(if_stmt + else_stmt) }
         match(:if_stmt){ |if_stmt| IfElseifElseNode.new(if_stmt) }
       end
 
       rule :if_stmt do
-        match('<', 'if', ',', :expr, '>', :block) { |_, _, _, expr, _, block| [IfStmtNode.new(BooleanNode.new(expr), block)] }
+        match('<', 'if', ',', :expr, '>', :block) { |_, _, _, expr, _, block|
+          [IfStmtNode.new(BooleanNode.new(expr), block)] }
       end
 
       rule :elseif_stmt do
-        match('<', 'elseif', ',', :expr, '>', :block, :elseif_stmt) { |_, _, _, expr, _, block, elseif_stmts| elseif_stmts + [IfStmtNode.new(BooleanNode.new(expr), block)].reverse }
-        match('<', 'elseif', ',', :expr, '>', :block) { |_, _, _, expr, _, block| [IfStmtNode.new(BooleanNode.new(expr), block)] }
+        match('<', 'elseif', ',', :expr, '>',
+              :block, :elseif_stmt) { |_, _, _, expr, _, block, elseif_stmts|
+          elseif_stmts + [IfStmtNode.new(BooleanNode.new(expr), block)].reverse
+        }
+        match('<', 'elseif', ',', :expr, '>',
+              :block) { |_, _, _, expr, _, block|
+          [IfStmtNode.new(BooleanNode.new(expr), block)] }
       end
 
       rule :else_stmt do
-        match('<', 'else', '>', :block) {|_, _, _, block| [IfStmtNode.new(block)] }
+        match('<', 'else', '>', :block) {|_, _, _, block|
+          [IfStmtNode.new(block)] }
       end
 
       rule :print_stmt do
-        match('<', 'print', ',', :expr, '>') {|_, _, _, a, _| PrintNode.new([a])}
+        match('<', 'print', ',', :expr, '>'){ |_, _, _, a, _|
+          PrintNode.new([a]) }
       end
 
       rule :read_stmt do
-        match('<', 'read', ',', :identifier, '>') {|_, _, _, input, _| InputNode.new([input])}
+        match('<', 'read', ',', :identifier, '>'){ |_, _, _, input, _|
+          InputNode.new([input]) }
       end
 
       rule :ins_stmt do
-        match('<', 'ins', ',', :identifier, ',', :expr, '>') {|_, _, _, id, _, expr| InsertNode.new(id, expr)}
+        match('<', 'ins', ',', :identifier, ',',
+              :expr, '>'){ |_, _, _, id, _, expr| InsertNode.new(id, expr) }
       end
 
       rule :rem_stmt do
-        match('<', 'rem', ',', :identifier, ',', :expr, '>') {|_, _, _, id, _, expr| RemoveNode.new(id, expr)}
-        match('<', 'rem', ',', :identifier, '>') {|_, _, _, id, _, expr| RemoveNode.new(id)}
+        match('<', 'rem', ',', :identifier, ',',
+              :expr, '>'){ |_, _, _, id, _, expr|
+          RemoveNode.new(id, expr) }
+        match('<', 'rem', ',', :identifier, '>'){ |_, _, _, id, _, expr|
+          RemoveNode.new(id) }
       end
 
       rule :func_stmt do
-        match('<', 'func', ',', :type, ',', :identifier, ',', :type_list, '>', :block){ |_, _, _,
+        match('<', 'func', ',', :type, ',',
+              :identifier, ',', :type_list, '>', :block){ |_, _, _,
           type, _, id, _, args, _, block|
-          FunctionNode.new(id, type, args, block)
-        }
+          FunctionNode.new(id, type, args, block) }
       end
 
       rule :func_call do
@@ -164,25 +177,31 @@ class OurStuff
       end
 
       rule :assign_stmt do
-        match('<', '=', ',', :identifier, ',', :expr, '>') {|_, _, _, id, _, expr, _| AssignmentNode.new(id, expr) }
+        match('<', '=', ',', :identifier, ',',
+              :expr, '>'){ |_, _, _, id, _, expr, _|
+          AssignmentNode.new(id, expr) }
       end
 
       rule :return_stmt do
-        match('<', 'return', ',', :expr, '>') {|_, _, _, expr| ReturnNode.new(expr)}
+        match('<', 'return', ',', :expr, '>'){ |_, _, _, expr|
+          ReturnNode.new(expr) }
       end
 
       rule :at_stmt do
-        match('<', 'at', ',', :identifier, ',', :integer, '>') { |_, _, _, id, _, index, _|
+        match('<', 'at', ',', :identifier, ',',
+              :integer, '>'){ |_, _, _, id, _, index, _|
           AtNode.new(id, index)
         }
       end
 
       rule :len_stmt do
-        match('<', 'len', ',', :identifier, '>') {|_, _, _, id| LengthNode.new(id)}
+        match('<', 'len', ',', :identifier, '>'){ |_, _, _, id|
+          LengthNode.new(id) }
       end
 
       rule :incr_decr_stmt do
-        match('<', :incr_decr_list, ',', :identifier, ',', :expr, '>'){ |_, incr_decr, _, id, _, expr, _|
+        match('<', :incr_decr_list, ',',
+              :identifier, ',', :expr, '>'){ |_, incr_decr, _, id, _, expr, _|
           IncrementNode.new(id, incr_decr, expr)
         }
       end
@@ -203,8 +222,13 @@ class OurStuff
       end
 
       rule :declaration do
-        match('<', :type, ',', :identifier, ',', :expr, '>') { |_,type,_,identifier,_,expr| IdentifierNode.new(identifier, type, expr) }
-        match('<', :type, ',', :identifier, '>') { |_,type,_,identifier| IdentifierNode.new(identifier, type) }
+        match('<', :type, ',', :identifier,
+              ',', :expr, '>'){ |_,type,_,id,_,expr|
+          IdentifierNode.new(id, type, expr)
+        }
+        match('<', :type, ',', :identifier, '>') {
+          |_,type,_,identifier| IdentifierNode.new(identifier, type)
+        }
       end
 
       rule :block do
@@ -250,14 +274,18 @@ class OurStuff
       end
 
       rule :num_expr do
-        match(:num_expr, '+', :term) {|num1, _, num2| AddNode.new(num1, num2)}
-        match(:num_expr, '-', :term) {|num1, _, num2| SubtractNode.new(num1, num2)}
+        match(:num_expr, '+', :term) { |num1, _, num2| AddNode.new(num1, num2) }
+        match(:num_expr, '-', :term) { |num1, _, num2|
+          SubtractNode.new(num1, num2)
+        }
         match(:term)
       end
 
       rule :term do
-        match(:term, '*', :factor) {|num1, _, num2| MultiplyNode.new(num1, num2)}
-        match(:term, '/', :factor) {|num1, _, num2| DivisionNode.new(num1, num2)}
+        match(:term, '*', :factor) { |num1, _, num2|
+          MultiplyNode.new(num1, num2) }
+        match(:term, '/', :factor) { |num1, _, num2|
+          DivisionNode.new(num1, num2) }
         match(:factor)
       end
 
@@ -301,7 +329,6 @@ class OurStuff
       end
 
       rule :string do
-        # Not sure why this stopped working
         match(/"[^"]*"/) {|s| StringNode.new(s[1,s.size-2]) }
       end
 
@@ -317,7 +344,7 @@ class OurStuff
   end
 
   def prompt
-    print "[stuff] "
+    print "[Sai-bot] "
     str = gets
     if done(str) then
       puts "Bye."
@@ -338,10 +365,6 @@ class OurStuff
     end
   end
 end
-
-# while true do
-#   OurStuff.new.prompt
-# end
 
 a = OurStuff.new
 a.log true
