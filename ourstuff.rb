@@ -8,6 +8,7 @@ class OurStuff
       token(/^"[^"]*"/) {|s| s}
       # Gets rid of all the whitespace
       token(/\s+/)
+      token(/^[a-z]+[a-z_]*/){ |m| m }
       token(/^</){|m| m}
       token(/^>/){|m| m}
       token(/^,/){|m| m}
@@ -42,7 +43,6 @@ class OurStuff
       token(/^ne/){|m| m}
       token(/^true/){|m| m}
       token(/^false/){|m| m}
-      token(/^[a-z]+[a-z_]*/){ |m| m }
       # Finds all floating point numbers
       token(/^(\d+\.\d*)|(\d*\.\d+)/) {|f| f.to_f}
       # Finds all integers
