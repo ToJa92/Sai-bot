@@ -386,7 +386,7 @@ class ReturnNode
   end
 
   def eval(scope)
-    @expr.eval(scope)
+    return get_var(scope, @expr)
   end
 end
 
