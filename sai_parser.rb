@@ -366,6 +366,6 @@ class OurStuff
   end
 end
 
-a = OurStuff.new
-a.log true
-a.parse(File.read("test.ut"))
+parser_instance = OurStuff.new
+parser_instance.log true
+parser_instance.parse(File.read(ARGV[0]))
