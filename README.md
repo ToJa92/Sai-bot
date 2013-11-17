@@ -1,6 +1,8 @@
 Sai-bot
 ========
 This is a language we've created for the course TDP019 at Linköping University.
-It is a dynamically-scoped typed language with prefix notation.
-Currently the type system is not enforced; the structure to support it is there but no type checking is done.
+At its core it is a dynamically-scoped, typed language with prefix notation.
 
+Known issues
+--------
+* Type checks are actually not made
